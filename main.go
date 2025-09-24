@@ -17,17 +17,22 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "snaplog",
-		Width:  1024,
-		Height: 768,
+		Title:  "SnapLog - Hotkey Text Logger",
+		Width:  600,
+		Height: 500,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup:        app.startup,
+		OnShutdown:       app.shutdown,
 		Bind: []interface{}{
 			app,
 		},
+		// Start hidden - only show when hotkey is pressed
+		StartHidden: true,
+		// Keep the app running in background even when window is closed
+		DisableResize: true,
 	})
 
 	if err != nil {
