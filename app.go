@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"golang.design/x/hotkey"
 )
 
 // App struct
 type App struct {
-	ctx     context.Context
-	hotkeyId uintptr
+	ctx          context.Context
+	hotkeyId     uintptr
+	packageHotkey *hotkey.Hotkey
 }
 
 // NewApp creates a new App application struct
@@ -33,7 +35,8 @@ func (a *App) startup(ctx context.Context) {
 // shutdown is called when the app is shutting down
 func (a *App) shutdown(ctx context.Context) {
 	fmt.Println("Shutting down SnapLog...")
-	// Hotkey cleanup is handled in the hotkey detection goroutine
+	// Stop hotkey detection if running
+	a.stopHotkeyDetection()
 }
 
 // LogText appends text to the log file with timestamp
@@ -89,4 +92,62 @@ func (a *App) GetLogFilePath() string {
 func (a *App) Quit() {
 	fmt.Println("Quitting SnapLog...")
 	runtime.Quit(a.ctx)
+}
+
+// startHotkeyDetection registers a global hotkey using golang.design/x/hotkey
+func (a *App) startHotkeyDetection() {
+	fmt.Println("Starting hotkey detection...")
+	
+	// Register Ctrl+Shift+L (Windows/Linux) or Cmd+Shift+L (macOS)
+	hk := hotkey.New([]hotkey.Modifier{hotkey.ModCtrl, hotkey.ModShift}, hotkey.KeyL)
+	
+	err := hk.Register()
+	if err != nil {
+		fmt.Printf("Failed to register hotkey: %v\n", err)
+		fmt.Println("Note: On macOS, this requires accessibility permissions.")
+		fmt.Println("Go to System Preferences > Security & Privacy > Privacy > Accessibility")
+		fmt.Println("On Linux, you may need to install additional packages or configure X11.")
+		return
+	}
+	
+	fmt.Println("Hotkey registered: Ctrl+Shift+L (or Cmd+Shift+L on macOS)")
+	
+	// Store the hotkey for cleanup
+	a.packageHotkey = hk
+	
+	// Listen for hotkey events in a goroutine
+	go func() {
+		for {
+			select {
+			case <-hk.Keydown():
+				fmt.Println("Hotkey detected! Showing window...")
+				a.ShowWindow()
+			}
+		}
+	}()
+}
+
+// stopHotkeyDetection stops the hotkey detection
+func (a *App) stopHotkeyDetection() {
+	if a.packageHotkey != nil {
+		fmt.Println("Unregistering hotkey...")
+		a.packageHotkey.Unregister()
+		a.packageHotkey = nil
+	}
+}
+
+// CheckAccessibilityPermissions returns true if accessibility permissions are granted (macOS)
+func (a *App) CheckAccessibilityPermissions() bool {
+	// This is a simple check - if we can register a hotkey, permissions are granted
+	if a.packageHotkey != nil {
+		return true
+	}
+	return false
+}
+
+// RequestAccessibilityPermissions prompts the user to grant accessibility permissions (macOS)
+func (a *App) RequestAccessibilityPermissions() {
+	fmt.Println("SnapLog requires accessibility permissions to register global hotkeys.")
+	fmt.Println("Please grant accessibility permissions in System Preferences > Security & Privacy > Privacy > Accessibility")
+	fmt.Println("After granting permissions, restart SnapLog.")
 }
