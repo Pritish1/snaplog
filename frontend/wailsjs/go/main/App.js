@@ -6,8 +6,20 @@ export function CheckAccessibilityPermissions() {
   return window['go']['main']['App']['CheckAccessibilityPermissions']();
 }
 
-export function GetLogFilePath() {
-  return window['go']['main']['App']['GetLogFilePath']();
+export function GetDatabasePath() {
+  return window['go']['main']['App']['GetDatabasePath']();
+}
+
+export function GetLogEntries(arg1) {
+  return window['go']['main']['App']['GetLogEntries'](arg1);
+}
+
+export function GetLogEntriesCount() {
+  return window['go']['main']['App']['GetLogEntriesCount']();
+}
+
+export function GetSettings() {
+  return window['go']['main']['App']['GetSettings']();
 }
 
 export function HideWindow() {
@@ -18,12 +30,32 @@ export function LogText(arg1) {
   return window['go']['main']['App']['LogText'](arg1);
 }
 
+export function OpenSettings() {
+  return window['go']['main']['App']['OpenSettings']();
+}
+
 export function Quit() {
   return window['go']['main']['App']['Quit']();
 }
 
+export function RenderMarkdown(arg1) {
+  return window['go']['main']['App']['RenderMarkdown'](arg1);
+}
+
 export function RequestAccessibilityPermissions() {
   return window['go']['main']['App']['RequestAccessibilityPermissions']();
+}
+
+export function SearchLogEntries(arg1, arg2) {
+  return window['go']['main']['App']['SearchLogEntries'](arg1, arg2);
+}
+
+export function SetSettings(arg1) {
+  return window['go']['main']['App']['SetSettings'](arg1);
+}
+
+export function ShowInstructions() {
+  return window['go']['main']['App']['ShowInstructions']();
 }
 
 export function ShowWindow() {

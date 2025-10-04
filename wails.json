@@ -9,5 +9,8 @@
   "author": {
     "name": "Pritish",
     "email": "pritish1998thombare@gmail.com"
+  },
+  "build": {
+    "cgo": false
   }
 }
