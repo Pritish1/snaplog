@@ -1,13 +1,477 @@
 #App {
     height: 100vh;
-    padding: 20px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    padding: 0;
+    margin: 0;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    background: #000000;
+    color: #00ff00;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+}
+
+.header {
+    background: #111111;
+    padding: 4px 12px;
+    border-bottom: 1px solid #333333;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 24px;
+    flex-shrink: 0;
+}
+
+.header h1 {
+    font-size: 0.8rem;
+    margin: 0;
+    font-weight: normal;
+    color: #00ff00;
+    text-shadow: 0 0 3px #00ff00;
+}
+
+.subtitle {
+    font-size: 0.7rem;
+    margin: 0;
+    color: #888888;
+}
+
+.input-container {
+    flex: 1;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.input-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    padding: 2px 6px;
+    background: #111111;
+    border: 1px solid #333333;
+    border-radius: 1px;
+    min-height: 20px;
+}
+
+.mode-indicator {
+    font-size: 0.7rem;
+    color: #888888;
+    font-weight: normal;
+}
+
+.header-buttons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.view-logs-btn {
+    background: #003300;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+    padding: 2px 6px;
+    border-radius: 1px;
+    font-size: 0.65rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    min-height: 16px;
+}
+
+.view-logs-btn:hover {
+    background: #00ff00;
+    color: #000000;
+    box-shadow: 0 0 3px #00ff00;
+}
+
+.preview-toggle {
+    background: #003300;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+    padding: 2px 6px;
+    border-radius: 1px;
+    font-size: 0.65rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    min-height: 16px;
+}
+
+.preview-toggle:hover {
+    background: #00ff00;
+    color: #000000;
+    box-shadow: 0 0 3px #00ff00;
+}
+
+.text-input {
+    flex: 1;
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #333333;
+    border-radius: 1px;
+    font-size: 0.85rem;
+    resize: none;
+    background: #000000;
+    color: #00ff00;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    outline: none;
+    box-shadow: inset 0 0 3px rgba(0, 255, 0, 0.1);
+    transition: all 0.2s;
+    min-height: 0;
+}
+
+.text-input:focus {
+    border-color: #00ff00;
+    box-shadow: inset 0 0 5px rgba(0, 255, 0, 0.2), 0 0 5px rgba(0, 255, 0, 0.1);
+}
+
+.text-input::placeholder {
+    color: #444444;
+}
+
+/* Markdown Preview Styles - CLI Theme */
+.markdown-preview {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid #333333;
+    border-radius: 2px;
+    background: #000000;
+    color: #00ff00;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    line-height: 1.4;
+    overflow-y: auto;
+    box-shadow: inset 0 0 5px rgba(0, 255, 0, 0.1);
+}
+
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3 {
+    margin: 8px 0 4px 0;
+    color: #00ff00;
+    text-align: left;
+    text-shadow: 0 0 3px #00ff00;
+}
+
+.markdown-preview h1 {
+    font-size: 1.1rem;
+    border-bottom: 1px solid #333333;
+    padding-bottom: 2px;
+}
+
+.markdown-preview h2 {
+    font-size: 1rem;
+    border-bottom: 1px solid #333333;
+    padding-bottom: 1px;
+}
+
+.markdown-preview h3 {
+    font-size: 0.9rem;
+}
+
+.markdown-preview p {
+    margin: 4px 0;
+    color: #00ff00;
+    text-align: left;
+}
+
+.markdown-preview ul,
+.markdown-preview ol {
+    margin: 4px 0;
+    padding-left: 16px;
+    text-align: left;
+}
+
+.markdown-preview li {
+    margin: 2px 0;
+    color: #00ff00;
+}
+
+.markdown-preview code {
+    background: #111111;
+    padding: 2px 4px;
+    border-radius: 1px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.85em;
+    color: #00ff00;
+    border: 1px solid #333333;
+}
+
+.markdown-preview pre {
+    background: #111111;
+    padding: 8px;
+    border-radius: 2px;
+    border: 1px solid #333333;
+    overflow-x: auto;
+    margin: 4px 0;
+    text-align: left;
+}
+
+.markdown-preview pre code {
+    background: none;
+    padding: 0;
+    color: #00ff00;
+    border: none;
+}
+
+.markdown-preview blockquote {
+    border-left: 2px solid #00ff00;
+    margin: 4px 0;
+    padding: 4px 12px;
+    background: #111111;
+    color: #888888;
+    text-align: left;
+}
+
+.markdown-preview a {
+    color: #00ff00;
+    text-decoration: underline;
+    text-shadow: 0 0 3px #00ff00;
+}
+
+.markdown-preview a:hover {
+    color: #ffffff;
+    text-shadow: 0 0 5px #ffffff;
+}
+
+.markdown-preview strong {
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.markdown-preview em {
+    font-style: italic;
+    color: #888888;
+}
+
+.markdown-preview hr {
+    border: none;
+    border-top: 1px solid #333333;
+    margin: 8px 0;
+}
+
+/* Modal Styles - CLI Theme */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
     align-items: center;
     justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #000000;
+    border: 1px solid #333333;
+    border-radius: 2px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #333333;
+    background: #111111;
+}
+
+.modal-header h2 {
+    margin: 0;
+    color: #00ff00;
+    font-size: 1rem;
+    font-weight: normal;
+    font-family: inherit;
+}
+
+.close-btn {
+    background: none;
+    border: 1px solid #333333;
+    font-size: 16px;
+    cursor: pointer;
+    color: #888888;
+    padding: 4px 8px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1px;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.close-btn:hover {
+    background: #333333;
+    color: #00ff00;
+    border-color: #00ff00;
+}
+
+.modal-body {
+    padding: 16px;
+    color: #00ff00;
+    font-family: inherit;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid #333333;
+    background: #111111;
+}
+
+.cancel-btn, .save-btn {
+    padding: 6px 12px;
+    border: 1px solid #333333;
+    border-radius: 1px;
+    font-size: 0.8rem;
+    font-weight: normal;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.cancel-btn {
+    background: #000000;
+    color: #888888;
+    border-color: #333333;
+}
+
+.cancel-btn:hover {
+    background: #333333;
+    color: #00ff00;
+    border-color: #00ff00;
+}
+
+.save-btn {
+    background: #003300;
+    color: #00ff00;
+    border-color: #00ff00;
+}
+
+.save-btn:hover {
+    background: #00ff00;
+    color: #000000;
+    box-shadow: 0 0 5px #00ff00;
+}
+
+/* Settings and Instructions Styles */
+.setting-group > label {
+    display: block;
+    font-weight: normal;
+    color: #00ff00;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.hotkey-config {
+    background: #111111;
+    padding: 12px;
+    border-radius: 1px;
+    border: 1px solid #333333;
+}
+
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 12px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    font-weight: normal;
+    color: #00ff00;
+    font-size: 0.8rem;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin-right: 6px;
+    accent-color: #00ff00;
+}
+
+.key-selection select {
+    padding: 4px 8px;
+    border: 1px solid #333333;
+    border-radius: 1px;
+    font-size: 0.8rem;
+    background: #000000;
+    color: #00ff00;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.hotkey-preview {
+    background: #111111;
+    padding: 8px;
+    border-radius: 1px;
+    border: 1px solid #00ff00;
+    color: #00ff00;
+    font-family: inherit;
+    font-size: 0.8rem;
+}
+
+.shortcut-item {
+    margin: 4px 0;
+    padding: 6px 8px;
+    background: #111111;
+    border-radius: 1px;
+    border-left: 2px solid #00ff00;
+    font-size: 0.8rem;
+    color: #00ff00;
+}
+
+.current-hotkey {
+    background: #111111;
+    padding: 8px;
+    border-radius: 1px;
+    border: 1px solid #00ff00;
+    color: #00ff00;
+    font-family: inherit;
+    text-align: center;
+    margin-top: 8px;
+    font-size: 0.8rem;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #111111;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #333333;
+    border-radius: 1px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #00ff00;
+}
+
+/* Responsive design */
+@media (max-width: 900px) {
+    #App {
+        padding: 0;
+    }
+    
+    .header h1 {
+        font-size: 0.9rem;
+    }
+    
+    .input-container {
+        padding: 12px;
+    }
 }
 
 .header {

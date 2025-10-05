@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SnapLog Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            opacity: 0.3;
+        }
+        
+        .header-content {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: transform 0.2s ease;
+        }
+        
+        .stat-item:hover {
+            transform: translateY(-2px);
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .day-group {
+            margin-bottom: 40px;
+        }
+        
+        .day-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .day-name {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+            margin-right: 15px;
+        }
+        
+        .day-date {
+            font-size: 1rem;
+            color: #666;
+            background: #f0f0f0;
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+        
+        .day-count {
+            margin-left: auto;
+            background: #667eea;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .entries-grid {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .entry {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .entry:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .entry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .entry-id {
+            background: #667eea;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .entry-time {
+            color: #666;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .entry-content {
+            color: #333;
+            line-height: 1.6;
+            word-break: break-word;
+            font-size: 0.95rem;
+        }
+        
+        /* Markdown content styling */
+        .entry-content h1, .entry-content h2, .entry-content h3, 
+        .entry-content h4, .entry-content h5, .entry-content h6 {
+            margin: 0.5em 0;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .entry-content h1 { font-size: 1.5em; }
+        .entry-content h2 { font-size: 1.3em; }
+        .entry-content h3 { font-size: 1.1em; }
+        
+        .entry-content p {
+            margin: 0.5em 0;
+        }
+        
+        .entry-content ul, .entry-content ol {
+            margin: 0.5em 0;
+            padding-left: 1.5em;
+        }
+        
+        .entry-content li {
+            margin: 0.25em 0;
+        }
+        
+        .entry-content code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .entry-content pre {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 0.5em 0;
+        }
+        
+        .entry-content pre code {
+            background: none;
+            padding: 0;
+        }
+        
+        .entry-content blockquote {
+            border-left: 4px solid #667eea;
+            padding-left: 16px;
+            margin: 0.5em 0;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .entry-content strong {
+            font-weight: 600;
+        }
+        
+        .entry-content em {
+            font-style: italic;
+        }
+        
+        .no-entries {
+            text-align: center;
+            padding: 80px;
+            color: #666;
+            font-size: 1.1rem;
+        }
+        
+        .no-entries-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 30px;
+            background: #f8f9fa;
+            color: #666;
+            font-size: 0.9rem;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+        .search-bar {
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+        
+        .search-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .search-input::placeholder {
+            color: #999;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 12px;
+            }
+            
+            .header {
+                padding: 30px 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .stats {
+                grid-template-columns: 1fr;
+                padding: 20px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .day-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            
+            .day-count {
+                margin-left: 0;
+            }
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <h1>SnapLog Dashboard</h1>
+                <p>Your personal knowledge repository</p>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number">{{.TotalEntries}}</div>
+                <div class="stat-label">Total Entries</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{.TotalDays}}</div>
+                <div class="stat-label">Active Days</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{.ThisWeek}}</div>
+                <div class="stat-label">This Week</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{.Generated}}</div>
+                <div class="stat-label">Generated</div>
+            </div>
+        </div>
+        
+        <div class="content">
+            {{if .DayGroups}}
+                {{range .DayGroups}}
+                <div class="day-group">
+                    <div class="day-header">
+                        <div class="day-name">{{.DayName}}</div>
+                        <div class="day-date">{{.Date}}</div>
+                        <div class="day-count">{{.Count}} entries</div>
+                    </div>
+                    
+                    <div class="entries-grid">
+                        {{range .Entries}}
+                        <div class="entry">
+                            <div class="entry-header">
+                                <span class="entry-id">#{{.ID}}</span>
+                                <span class="entry-time">{{.LocalTime}}</span>
+                            </div>
+                            <div class="entry-content">{{.RenderedHTML}}</div>
+                        </div>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+            {{else}}
+                <div class="no-entries">
+                    <div class="no-entries-icon">📝</div>
+                    <p>No entries found. Start logging your thoughts!</p>
+                </div>
+            {{end}}
+        </div>
+        
+        <div class="footer">
+            <p>Generated on {{.Generated}} | <a href="#" onclick="window.location.reload()">Refresh</a> | SnapLog Dashboard</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -34,6 +34,10 @@ export function OpenSettings() {
   return window['go']['main']['App']['OpenSettings']();
 }
 
+export function ProcessCommand(arg1) {
+  return window['go']['main']['App']['ProcessCommand'](arg1);
+}
+
 export function Quit() {
   return window['go']['main']['App']['Quit']();
 }

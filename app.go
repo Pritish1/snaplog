@@ -34,6 +34,51 @@ type LogEntry struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// DayGroup represents a group of entries for a specific day
+type DayGroup struct {
+	DayName string    `json:"day_name"`
+	Date    string    `json:"date"`
+	Count   int       `json:"count"`
+	Entries []LogEntry `json:"entries"`
+}
+
+// DashboardData represents the data structure for the dashboard
+type DashboardData struct {
+	TotalEntries int        `json:"total_entries"`
+	TotalDays    int        `json:"total_days"`
+	ThisWeek     int        `json:"this_week"`
+	Generated    string     `json:"generated"`
+	DayGroups    []DayGroup `json:"day_groups"`
+}
+
+// DisplayEntry represents a log entry formatted for display
+type DisplayEntry struct {
+	ID           int             `json:"id"`
+	Content      string          `json:"content"`
+	RenderedHTML template.HTML   `json:"rendered_html"`
+	LocalTime    string          `json:"local_time"`
+	CreatedAt    time.Time       `json:"created_at"`
+}
+
+// DisplayDayGroup represents a group of display entries for a specific day
+type DisplayDayGroup struct {
+	DayName string         `json:"day_name"`
+	Date    string         `json:"date"`
+	Count   int            `json:"count"`
+	Entries []DisplayEntry `json:"entries"`
+}
+
+// DisplayDashboardData represents the data structure for the dashboard with display formatting
+type DisplayDashboardData struct {
+	TotalEntries int              `json:"total_entries"`
+	TotalDays    int              `json:"total_days"`
+	ThisWeek     int              `json:"this_week"`
+	Generated    string           `json:"generated"`
+	DayGroups    []DisplayDayGroup `json:"day_groups"`
+}
+
+
+
 // App struct
 type App struct {
 	ctx          context.Context
@@ -145,6 +190,53 @@ func (a *App) createTables() error {
 	return err
 }
 
+// ProcessCommand handles slash commands
+func (a *App) ProcessCommand(command string) error {
+	fmt.Printf("Processing command: %s\n", command)
+	
+	switch command {
+	case "/dash":
+		return a.generateDashboard()
+	case "/help":
+		return a.showHelp()
+	case "/stats":
+		return a.showStats()
+	default:
+		return fmt.Errorf("unknown command: %s. Type /help for available commands", command)
+	}
+}
+
+// showHelp displays available commands
+func (a *App) showHelp() error {
+	fmt.Println("\n=== SnapLog CLI Commands ===")
+	fmt.Println("\nAvailable Commands:")
+	fmt.Println("  /dash  - Generate HTML dashboard and open in browser")
+	fmt.Println("  /help  - Show this help message")
+	fmt.Println("  /stats - Show database statistics")
+	fmt.Println("\nKeyboard Shortcuts:")
+	fmt.Println("  Enter        - Log text and hide window")
+	fmt.Println("  Shift+Enter  - Create a new line")
+	fmt.Println("  Ctrl+Tab     - Toggle Markdown preview")
+	fmt.Println("  Esc          - Hide window without saving")
+	fmt.Println("\n=============================")
+	return nil
+}
+
+// showStats displays database statistics
+func (a *App) showStats() error {
+	count, err := a.GetLogEntriesCount()
+	if err != nil {
+		return fmt.Errorf("failed to get log count: %v", err)
+	}
+	
+	fmt.Printf("\n=== SnapLog Statistics ===\n")
+	fmt.Printf("Total entries: %d\n", count)
+	fmt.Printf("Database: %s\n", a.GetDatabasePath())
+	fmt.Printf("Hotkey: %v+%v\n", a.settings.HotkeyModifiers, a.settings.HotkeyKey)
+	fmt.Printf("========================\n")
+	return nil
+}
+
 // LogText saves text to the SQLite database with timestamp
 func (a *App) LogText(text string) error {
 	if text == "" {
@@ -152,12 +244,6 @@ func (a *App) LogText(text string) error {
 	}
 
 	fmt.Printf("LogText called with: '%s'\n", text)
-
-	// Check for special commands
-	if strings.TrimSpace(text) == "/dash" {
-		fmt.Println("Detected /dash command, generating dashboard...")
-		return a.generateDashboard()
-	}
 
 	if a.db == nil {
 		return fmt.Errorf("database not initialized")
@@ -178,30 +264,163 @@ func (a *App) LogText(text string) error {
 func (a *App) generateDashboard() error {
 	fmt.Println("Starting dashboard generation...")
 	
+	data, err := a.getDashboardData()
+	if err != nil {
+		fmt.Printf("Error getting dashboard data: %v\n", err)
+		return fmt.Errorf("failed to get dashboard data: %v", err)
+	}
+	fmt.Println("Dashboard data prepared successfully")
+
+	htmlContent, err := a.generateHTMLFromTemplate(data)
+	if err != nil {
+		fmt.Printf("Error generating HTML from template: %v\n", err)
+		return fmt.Errorf("failed to generate HTML from template: %v", err)
+	}
+	fmt.Println("HTML content generated from template successfully")
+
+	err = a.saveAndOpenDashboard(htmlContent)
+	if err != nil {
+		fmt.Printf("Error saving and opening dashboard: %v\n", err)
+		return fmt.Errorf("failed to save and open dashboard: %v", err)
+	}
+
+	fmt.Println("Dashboard generated and opened successfully!")
+	return nil
+}
+
+// getDashboardData prepares data for the dashboard with proper formatting
+func (a *App) getDashboardData() (*DisplayDashboardData, error) {
 	// Get all log entries
-	entries, err := a.GetLogEntries(1000) // Get up to 1000 entries
+	entries, err := a.GetLogEntries(1000)
 	if err != nil {
-		fmt.Printf("Error getting log entries: %v\n", err)
-		return fmt.Errorf("failed to get log entries: %v", err)
+		return nil, fmt.Errorf("failed to get log entries: %v", err)
 	}
-	fmt.Printf("Retrieved %d log entries\n", len(entries))
-
-	// Get log count
-	count, err := a.GetLogEntriesCount()
+	
+	// Get total count
+	totalCount, err := a.GetLogEntriesCount()
 	if err != nil {
-		fmt.Printf("Error getting log count: %v\n", err)
-		return fmt.Errorf("failed to get log count: %v", err)
+		return nil, fmt.Errorf("failed to get log count: %v", err)
 	}
-	fmt.Printf("Total log count: %d\n", count)
+	
+	// Convert entries to display format with local time and rendered markdown
+	displayEntries := make([]DisplayEntry, len(entries))
+	for i, entry := range entries {
+		// Convert UTC to local time
+		localTime := entry.CreatedAt.Local()
+		
+		// Render markdown to HTML
+		renderedHTML, err := a.RenderMarkdown(entry.Content)
+		if err != nil {
+			// If markdown rendering fails, use plain text
+			renderedHTML = fmt.Sprintf("<p>%s</p>", strings.ReplaceAll(entry.Content, "\n", "<br>"))
+		}
+		
+		displayEntries[i] = DisplayEntry{
+			ID:           entry.ID,
+			Content:      entry.Content,
+			RenderedHTML: template.HTML(renderedHTML),
+			LocalTime:    localTime.Format("15:04"),
+			CreatedAt:    entry.CreatedAt,
+		}
+	}
+	
+	// Group entries by day using local time
+	dayGroups := a.groupDisplayEntriesByDay(displayEntries)
+	
+	// Calculate statistics
+	thisWeek := a.calculateThisWeekCount(entries)
+	
+	return &DisplayDashboardData{
+		TotalEntries: totalCount,
+		TotalDays:    len(dayGroups),
+		ThisWeek:     thisWeek,
+		Generated:    time.Now().Local().Format("2006-01-02 15:04:05"),
+		DayGroups:    dayGroups,
+	}, nil
+}
 
-	// Generate HTML
-	htmlContent, err := a.generateHTML(entries, count)
+// groupDisplayEntriesByDay groups display entries by day using local time
+func (a *App) groupDisplayEntriesByDay(entries []DisplayEntry) []DisplayDayGroup {
+	dayMap := make(map[string][]DisplayEntry)
+	
+	for _, entry := range entries {
+		// Use local time for grouping
+		localTime := entry.CreatedAt.Local()
+		dayKey := localTime.Format("2006-01-02")
+		dayMap[dayKey] = append(dayMap[dayKey], entry)
+	}
+	
+	var dayGroups []DisplayDayGroup
+	for _, dayEntries := range dayMap {
+		// Parse the date using local time
+		localTime := dayEntries[0].CreatedAt.Local()
+	
+		
+		dayGroup := DisplayDayGroup{
+			DayName: localTime.Format("Monday"),
+			Date:    localTime.Format("Jan 2, 2006"),
+			Count:   len(dayEntries),
+			Entries: dayEntries,
+		}
+		dayGroups = append(dayGroups, dayGroup)
+	}
+	
+	// Sort by date (newest first)
+	for i := 0; i < len(dayGroups); i++ {
+		for j := i + 1; j < len(dayGroups); j++ {
+			date1, _ := time.Parse("Jan 2, 2006", dayGroups[i].Date)
+			date2, _ := time.Parse("Jan 2, 2006", dayGroups[j].Date)
+			if date1.Before(date2) {
+				dayGroups[i], dayGroups[j] = dayGroups[j], dayGroups[i]
+			}
+		}
+	}
+	
+	return dayGroups
+}
+
+// calculateThisWeekCount counts entries from this week
+func (a *App) calculateThisWeekCount(entries []LogEntry) int {
+	now := time.Now()
+	weekStart := now.AddDate(0, 0, -int(now.Weekday()))
+	weekStart = time.Date(weekStart.Year(), weekStart.Month(), weekStart.Day(), 0, 0, 0, 0, weekStart.Location())
+	
+	count := 0
+	for _, entry := range entries {
+		if entry.CreatedAt.After(weekStart) {
+			count++
+		}
+	}
+	return count
+}
+
+// generateHTMLFromTemplate generates HTML from the template file
+func (a *App) generateHTMLFromTemplate(data *DisplayDashboardData) (string, error) {
+	// Read template file
+	templatePath := filepath.Join(".", "templates", "dashboard.html")
+	templateContent, err := os.ReadFile(templatePath)
 	if err != nil {
-		fmt.Printf("Error generating HTML: %v\n", err)
-		return fmt.Errorf("failed to generate HTML: %v", err)
+		return "", fmt.Errorf("failed to read template file: %v", err)
 	}
-	fmt.Println("HTML content generated successfully")
+	
+	// Parse template
+	tmpl, err := template.New("dashboard").Parse(string(templateContent))
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template: %v", err)
+	}
+	
+	// Execute template
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, data)
+	if err != nil {
+		return "", fmt.Errorf("failed to execute template: %v", err)
+	}
+	
+	return buf.String(), nil
+}
 
+// saveAndOpenDashboard saves HTML content and opens it in browser
+func (a *App) saveAndOpenDashboard(htmlContent string) error {
 	// Get temp directory path
 	tempPath, err := a.getTempPath()
 	if err != nil {
@@ -209,249 +428,28 @@ func (a *App) generateDashboard() error {
 		return fmt.Errorf("failed to get temp path: %v", err)
 	}
 	fmt.Printf("Temp path: %s\n", tempPath)
-
+	
 	// Write HTML file
 	htmlFile := filepath.Join(tempPath, "snaplog-dashboard.html")
+	fmt.Printf("Writing HTML file to: %s\n", htmlFile)
 	err = os.WriteFile(htmlFile, []byte(htmlContent), 0644)
 	if err != nil {
 		fmt.Printf("Error writing HTML file: %v\n", err)
 		return fmt.Errorf("failed to write HTML file: %v", err)
 	}
-	fmt.Printf("HTML file written to: %s\n", htmlFile)
-
+	fmt.Printf("HTML file written successfully\n")
+	
 	// Open in browser
+	fmt.Printf("Opening browser with file: %s\n", htmlFile)
 	err = a.openInBrowser(htmlFile)
 	if err != nil {
 		fmt.Printf("Error opening browser: %v\n", err)
 		return fmt.Errorf("failed to open browser: %v", err)
 	}
-	fmt.Println("Browser opened successfully")
-
+	fmt.Printf("Browser opened successfully\n")
+	
 	fmt.Printf("Dashboard generated: %s\n", htmlFile)
 	return nil
-}
-
-// generateHTML creates the HTML content for the dashboard
-func (a *App) generateHTML(entries []LogEntry, count int) (string, error) {
-	const htmlTemplate = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SnapLog Dashboard</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            font-weight: 300;
-        }
-        
-        .header p {
-            font-size: 1.1rem;
-            opacity: 0.9;
-        }
-        
-        .stats {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        
-        .stat-item {
-            text-align: center;
-        }
-        
-        .stat-number {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #667eea;
-        }
-        
-        .stat-label {
-            color: #666;
-            font-size: 0.9rem;
-        }
-        
-        .entries-container {
-            padding: 30px;
-        }
-        
-        .entry {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 15px;
-            border-left: 4px solid #667eea;
-            transition: transform 0.2s ease;
-        }
-        
-        .entry:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        
-        .entry-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        
-        .entry-id {
-            background: #667eea;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-        
-        .entry-date {
-            color: #666;
-            font-size: 0.9rem;
-        }
-        
-        .entry-content {
-            color: #333;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-        
-        .no-entries {
-            text-align: center;
-            padding: 60px;
-            color: #666;
-            font-size: 1.1rem;
-        }
-        
-        .footer {
-            text-align: center;
-            padding: 20px;
-            background: #f8f9fa;
-            color: #666;
-            font-size: 0.9rem;
-        }
-        
-        @media (max-width: 768px) {
-            .stats {
-                flex-direction: column;
-                gap: 15px;
-            }
-            
-            .entry-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 5px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>SnapLog Dashboard</h1>
-            <p>Your personal text logging dashboard</p>
-        </div>
-        
-        <div class="stats">
-            <div class="stat-item">
-                <div class="stat-number">{{.Count}}</div>
-                <div class="stat-label">Total Entries</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number">{{.Displayed}}</div>
-                <div class="stat-label">Displayed</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number">{{.Generated}}</div>
-                <div class="stat-label">Generated</div>
-            </div>
-        </div>
-        
-        <div class="entries-container">
-            {{if .Entries}}
-                {{range .Entries}}
-                <div class="entry">
-                    <div class="entry-header">
-                        <span class="entry-id">#{{.ID}}</span>
-                        <span class="entry-date">{{.CreatedAt}}</span>
-                    </div>
-                    <div class="entry-content">{{.Content}}</div>
-                </div>
-                {{end}}
-            {{else}}
-                <div class="no-entries">
-                    <p>No log entries found.</p>
-                </div>
-            {{end}}
-        </div>
-        
-        <div class="footer">
-            <p>Generated on {{.Generated}} | SnapLog Dashboard</p>
-        </div>
-    </div>
-</body>
-</html>`
-
-	// Prepare template data
-	data := struct {
-		Entries    []LogEntry
-		Count      int
-		Displayed  int
-		Generated  string
-	}{
-		Entries:   entries,
-		Count:     count,
-		Displayed: len(entries),
-		Generated: time.Now().Format("2006-01-02 15:04:05"),
-	}
-
-	// Parse and execute template
-	tmpl, err := template.New("dashboard").Parse(htmlTemplate)
-	if err != nil {
-		return "", err
-	}
-
-	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, data)
-	if err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
 }
 
 // getTempPath returns a temporary directory path for the HTML file
@@ -461,7 +459,14 @@ func (a *App) getTempPath() (string, error) {
 	if tempDir == "" {
 		return "", fmt.Errorf("could not get temp directory")
 	}
-	return tempDir, nil
+	
+	// Create snaplog temp directory
+	snaplogTempDir := filepath.Join(tempDir, "snaplog-dashboards")
+	if err := os.MkdirAll(snaplogTempDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create temp dashboard directory: %v", err)
+	}
+	
+	return snaplogTempDir, nil
 }
 
 // openInBrowser opens the HTML file in the default browser
@@ -709,11 +714,11 @@ func (a *App) onSystemTrayReady() {
 	// Create menu items
 	showWindow := systray.AddMenuItem("Show Window", "Show the main window")
 	systray.AddSeparator()
-	settings := systray.AddMenuItem("Settings...", "Open settings")
+	settings := systray.AddMenuItem("Settings...", "Configure hotkey")
 	systray.AddSeparator()
-	instructions := systray.AddMenuItem("Instructions", "Show keyboard shortcuts")
+	instructions := systray.AddMenuItem("Instructions", "Keyboard shortcuts and usage")
 	systray.AddSeparator()
-	quit := systray.AddMenuItem("Quit", "Quit SnapLog")
+	quit := systray.AddMenuItem("Quit", "Exit SnapLog")
 	
 	// Signal that system tray is ready
 	a.systrayReady <- true
@@ -750,10 +755,24 @@ func (a *App) OpenSettings() {
 
 // ShowInstructions shows keyboard shortcuts and usage instructions
 func (a *App) ShowInstructions() {
-	// Show the main window first
-	a.ShowWindow()
-	// Then emit the event to show instructions
-	wailsRuntime.EventsEmit(a.ctx, "show-instructions")
+	fmt.Println("\n=== SnapLog CLI Instructions ===")
+	fmt.Println("\nKeyboard Shortcuts:")
+	fmt.Println("  Enter        - Log text and hide window")
+	fmt.Println("  Shift+Enter  - Create a new line")
+	fmt.Println("  Ctrl+Tab     - Toggle Markdown preview")
+	fmt.Println("  Esc          - Hide window without saving")
+	fmt.Println("\nCommands:")
+	fmt.Println("  /dash        - Generate HTML dashboard and open in browser")
+	fmt.Println("\nMarkdown Support:")
+	fmt.Println("  # Header     - Create headers")
+	fmt.Println("  **bold**     - Bold text")
+	fmt.Println("  *italic*     - Italic text")
+	fmt.Println("  `code`       - Inline code")
+	fmt.Println("  - list       - Bullet lists")
+	fmt.Println("\nSystem Tray:")
+	fmt.Println("  Right-click tray icon for menu options")
+	fmt.Printf("  Current hotkey: %v+%v\n", a.settings.HotkeyModifiers, a.settings.HotkeyKey)
+	fmt.Println("\n===============================")
 }
 
 // GetSettings returns the current settings

@@ -18,6 +18,8 @@ export function LogText(arg1:string):Promise<void>;
 
 export function OpenSettings():Promise<void>;
 
+export function ProcessCommand(arg1:string):Promise<void>;
+
 export function Quit():Promise<void>;
 
 export function RenderMarkdown(arg1:string):Promise<string>;

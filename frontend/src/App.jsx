@@ -1,12 +1,11 @@
 import {useState, useEffect} from 'react';
 import './App.css';
-import {LogText, HideWindow, Quit, GetSettings, SetSettings, RenderMarkdown} from "../wailsjs/go/main/App";
+import {LogText, HideWindow, Quit, GetSettings, SetSettings, RenderMarkdown, ProcessCommand} from "../wailsjs/go/main/App";
 import {EventsOn} from "../wailsjs/runtime/runtime";
 
 function App() {
     const [text, setText] = useState('');
     const [showSettings, setShowSettings] = useState(false);
-    const [showInstructions, setShowInstructions] = useState(false);
     const [previewMode, setPreviewMode] = useState(false);
     const [renderedHtml, setRenderedHtml] = useState('');
     const [settings, setSettings] = useState({
@@ -27,11 +26,6 @@ function App() {
             setTempSettings({...settings});
             setShowSettings(true);
         });
-        
-        // Listen for show-instructions event from system menu
-        EventsOn("show-instructions", () => {
-            setShowInstructions(true);
-        });
     }, []);
 
     const handleTextChange = (e) => setText(e.target.value);
@@ -41,11 +35,10 @@ function App() {
             return;
         }
 
-        // Check for special commands
-        if (text.trim() === '/dash') {
+        // Check for slash commands
+        if (text.trim().startsWith('/')) {
             try {
-                // Call the dashboard generation directly
-                await LogText('/dash');
+                await ProcessCommand(text.trim());
                 setText(''); // Clear the input
                 // Hide the window immediately
                 setTimeout(() => {
@@ -53,7 +46,7 @@ function App() {
                 }, 100);
                 return;
             } catch (error) {
-                console.error('Error generating dashboard:', error);
+                console.error('Error processing command:', error);
                 return;
             }
         }
@@ -118,10 +111,6 @@ function App() {
         setShowSettings(false);
     };
 
-    const closeInstructions = () => {
-        setShowInstructions(false);
-    };
-
     const toggleModifier = (modifier) => {
         const newModifiers = tempSettings.hotkey_modifiers.includes(modifier)
             ? tempSettings.hotkey_modifiers.filter(m => m !== modifier)
@@ -145,8 +134,8 @@ function App() {
     return (
         <div id="App">
             <div className="header">
-                <h1>SnapLog</h1>
-                <p className="subtitle">Quick text logging utility</p>
+                <h1>SnapLog CLI</h1>
+                <p className="subtitle">Ctrl+Tab: Preview | Esc: Exit</p>
             </div>
             
             <div className="input-container">
@@ -236,88 +225,6 @@ function App() {
                         <div className="modal-footer">
                             <button className="cancel-btn" onClick={closeSettings}>Cancel</button>
                             <button className="save-btn" onClick={saveSettings}>Save Settings</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Instructions Modal */}
-            {showInstructions && (
-                <div className="modal-overlay" onClick={closeInstructions}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>Instructions</h2>
-                            <button className="close-btn" onClick={closeInstructions}>×</button>
-                        </div>
-                        
-                        <div className="modal-body">
-                            <div className="instructions-content">
-                                <h3>Keyboard Shortcuts</h3>
-                                <div className="shortcut-list">
-                                    <div className="shortcut-item">
-                                        <strong>Enter:</strong> Log text and hide window
-                                    </div>
-                                    <div className="shortcut-item">
-                                        <strong>Shift+Enter:</strong> Create a new line
-                                    </div>
-                                    <div className="shortcut-item">
-                                        <strong>Ctrl+Tab:</strong> Toggle Markdown preview
-                                    </div>
-                                    <div className="shortcut-item">
-                                        <strong>Esc:</strong> Hide window without saving
-                                    </div>
-                                </div>
-                                
-                                <h3>Markdown Support</h3>
-                                <div className="shortcut-list">
-                                    <div className="shortcut-item">
-                                        <strong>Headers:</strong> # H1, ## H2, ### H3
-                                    </div>
-                                    <div className="shortcut-item">
-                                        <strong>Lists:</strong> - Bullet, 1. Numbered
-                                    </div>
-                                    <div className="shortcut-item">
-                                        <strong>Links:</strong> [text](url)
-                                    </div>
-                                    <div className="shortcut-item">
-                                        <strong>Bold:</strong> **bold text**
-                                    </div>
-                                    <div className="shortcut-item">
-                                        <strong>Italic:</strong> *italic text*
-                                    </div>
-                                    <div className="shortcut-item">
-                                        <strong>Code:</strong> `inline code`
-                                    </div>
-                                </div>
-                                
-                                <h3>System Tray</h3>
-                                <div className="shortcut-list">
-                                    <div className="shortcut-item">
-                                        <strong>Right-click tray icon:</strong> Access menu
-                                    </div>
-                                    <div className="shortcut-item">
-                                        <strong>Show Window:</strong> Display main window
-                                    </div>
-                                    <div className="shortcut-item">
-                                        <strong>Settings:</strong> Configure hotkey
-                                    </div>
-                                    <div className="shortcut-item">
-                                        <strong>Instructions:</strong> Show this help
-                                    </div>
-                                    <div className="shortcut-item">
-                                        <strong>Quit:</strong> Exit application
-                                    </div>
-                                </div>
-                                
-                                <h3>Current Hotkey</h3>
-                                <div className="current-hotkey">
-                                    <strong>{formatHotkey(settings.hotkey_modifiers, settings.hotkey_key)}</strong> - Show window
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="modal-footer">
-                            <button className="save-btn" onClick={closeInstructions}>Got it!</button>
                         </div>
                     </div>
                 </div>
