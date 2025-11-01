@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/getlantern/systray"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.design/x/hotkey"
 	"github.com/yuin/goldmark"
@@ -25,6 +24,8 @@ import (
 type Settings struct {
 	HotkeyModifiers []string `json:"hotkey_modifiers"`
 	HotkeyKey       string   `json:"hotkey_key"`
+	FirstRun        bool     `json:"first_run"`
+	Theme           string   `json:"theme"` // "light" or "dark"
 }
 
 // LogEntry represents a log entry in the database
@@ -58,6 +59,7 @@ type DisplayEntry struct {
 	RenderedHTML template.HTML   `json:"rendered_html"`
 	LocalTime    string          `json:"local_time"`
 	CreatedAt    time.Time       `json:"created_at"`
+	DateString   string          `json:"date_string"`
 }
 
 // DisplayDayGroup represents a group of display entries for a specific day
@@ -85,7 +87,6 @@ type App struct {
 	hotkeyId     uintptr
 	packageHotkey *hotkey.Hotkey
 	settings     *Settings
-	systrayReady chan bool
 	db           *sql.DB
 }
 
@@ -95,8 +96,9 @@ func NewApp() *App {
 		settings: &Settings{
 			HotkeyModifiers: []string{"ctrl", "shift"},
 			HotkeyKey:       "l",
+			FirstRun:        true,
+			Theme:           "dark",
 		},
-		systrayReady: make(chan bool),
 	}
 }
 
@@ -115,14 +117,26 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	
-	// Start system tray in a goroutine
-	go a.runSystemTray()
-	
-	// Wait for system tray to be ready
-	<-a.systrayReady
-	
-	// Start hotkey detection in a goroutine
-	go a.startHotkeyDetection()
+	// Check if this is the first run
+	if a.settings.FirstRun {
+		fmt.Println("First run detected - showing setup window")
+		// Show window for first-time setup and emit event to open settings
+		go func() {
+			time.Sleep(500 * time.Millisecond) // Wait for window to be ready
+			a.ShowWindow()
+			wailsRuntime.EventsEmit(a.ctx, "show-first-run-setup")
+		}()
+	} else {
+		// For subsequent runs, show then immediately minimize to taskbar
+		// This ensures the taskbar icon is visible from first launch
+		go func() {
+			time.Sleep(100 * time.Millisecond) // Wait for window to be ready
+			wailsRuntime.WindowShow(a.ctx)
+			wailsRuntime.WindowMinimise(a.ctx)
+		}()
+		// Start hotkey detection only after initial setup
+		go a.startHotkeyDetection()
+	}
 }
 
 // shutdown is called when the app is shutting down
@@ -197,6 +211,9 @@ func (a *App) ProcessCommand(command string) error {
 	switch command {
 	case "/dash":
 		return a.generateDashboard()
+	case "/settings":
+		a.OpenSettings()
+		return nil
 	case "/help":
 		return a.showHelp()
 	case "/stats":
@@ -210,9 +227,10 @@ func (a *App) ProcessCommand(command string) error {
 func (a *App) showHelp() error {
 	fmt.Println("\n=== SnapLog CLI Commands ===")
 	fmt.Println("\nAvailable Commands:")
-	fmt.Println("  /dash  - Generate HTML dashboard and open in browser")
-	fmt.Println("  /help  - Show this help message")
-	fmt.Println("  /stats - Show database statistics")
+	fmt.Println("  /dash     - Generate HTML dashboard and open in browser")
+	fmt.Println("  /settings - Open settings to configure hotkey")
+	fmt.Println("  /help     - Show this help message")
+	fmt.Println("  /stats    - Show database statistics")
 	fmt.Println("\nKeyboard Shortcuts:")
 	fmt.Println("  Enter        - Log text and hide window")
 	fmt.Println("  Shift+Enter  - Create a new line")
@@ -257,6 +275,23 @@ func (a *App) LogText(text string) error {
 	}
 
 	fmt.Printf("Logged text: %s\n", text)
+	return nil
+}
+
+// ClearAllData deletes all log entries from the database
+func (a *App) ClearAllData() error {
+	if a.db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	// Delete all entries from database
+	query := `DELETE FROM log_entries`
+	_, err := a.db.Exec(query)
+	if err != nil {
+		return fmt.Errorf("failed to delete log entries: %v", err)
+	}
+
+	fmt.Println("All log entries deleted successfully")
 	return nil
 }
 
@@ -321,6 +356,7 @@ func (a *App) getDashboardData() (*DisplayDashboardData, error) {
 			RenderedHTML: template.HTML(renderedHTML),
 			LocalTime:    localTime.Format("15:04"),
 			CreatedAt:    entry.CreatedAt,
+			DateString:   localTime.Format("2006-01-02"),
 		}
 	}
 	
@@ -358,7 +394,7 @@ func (a *App) groupDisplayEntriesByDay(entries []DisplayEntry) []DisplayDayGroup
 		
 		dayGroup := DisplayDayGroup{
 			DayName: localTime.Format("Monday"),
-			Date:    localTime.Format("Jan 2, 2006"),
+			Date:    localTime.Format("2006-01-02"), // Use ISO format for JavaScript compatibility
 			Count:   len(dayEntries),
 			Entries: dayEntries,
 		}
@@ -368,8 +404,8 @@ func (a *App) groupDisplayEntriesByDay(entries []DisplayEntry) []DisplayDayGroup
 	// Sort by date (newest first)
 	for i := 0; i < len(dayGroups); i++ {
 		for j := i + 1; j < len(dayGroups); j++ {
-			date1, _ := time.Parse("Jan 2, 2006", dayGroups[i].Date)
-			date2, _ := time.Parse("Jan 2, 2006", dayGroups[j].Date)
+			date1, _ := time.Parse("2006-01-02", dayGroups[i].Date)
+			date2, _ := time.Parse("2006-01-02", dayGroups[j].Date)
 			if date1.Before(date2) {
 				dayGroups[i], dayGroups[j] = dayGroups[j], dayGroups[i]
 			}
@@ -575,7 +611,8 @@ func (a *App) ShowWindow() {
 
 // HideWindow hides the app window
 func (a *App) HideWindow() {
-	wailsRuntime.WindowHide(a.ctx)
+	// Use Minimize instead of Hide to keep taskbar icon visible
+	wailsRuntime.WindowMinimise(a.ctx)
 }
 
 // GetDatabasePath returns the current database file path
@@ -598,20 +635,8 @@ func (a *App) Quit() {
 func (a *App) startHotkeyDetection() {
 	fmt.Println("Starting hotkey detection...")
 	
-	// Parse modifiers from settings
-	var modifiers []hotkey.Modifier
-	for _, mod := range a.settings.HotkeyModifiers {
-		switch mod {
-		case "ctrl":
-			modifiers = append(modifiers, hotkey.ModCtrl)
-		case "cmd", "meta":
-			modifiers = append(modifiers, hotkey.ModCtrl) // Use Ctrl as fallback for Cmd
-		case "alt":
-			modifiers = append(modifiers, hotkey.ModAlt)
-		case "shift":
-			modifiers = append(modifiers, hotkey.ModShift)
-		}
-	}
+	// Parse modifiers from settings (platform-specific implementation)
+	modifiers := parseModifiers(a.settings.HotkeyModifiers)
 	
 	// Parse key from settings
 	var key hotkey.Key
@@ -684,66 +709,6 @@ func (a *App) RequestAccessibilityPermissions() {
 	fmt.Println("After granting permissions, restart SnapLog.")
 }
 
-// setupSystemMenu creates a simple menu (placeholder for now)
-func (a *App) setupSystemMenu() {
-	// For now, we'll use a simple approach
-	// In Wails v2, system tray might not be fully supported
-	// We'll implement a settings button in the main UI instead
-	fmt.Println("System menu setup (placeholder)")
-}
-
-// runSystemTray initializes and runs the system tray
-func (a *App) runSystemTray() {
-	systray.Run(a.onSystemTrayReady, a.onSystemTrayExit)
-}
-
-// onSystemTrayReady is called when the system tray is ready
-func (a *App) onSystemTrayReady() {
-	// Try to read the appicon.png file
-	iconData, err := os.ReadFile("build/appicon.png")
-	if err != nil {
-		fmt.Printf("Warning: Could not read appicon.png: %v\n", err)
-		// Fallback to empty icon if file not found
-		iconData = []byte{}
-	}
-	
-	systray.SetIcon(iconData)
-	systray.SetTitle("SnapLog")
-	systray.SetTooltip("SnapLog - Hotkey Text Logger")
-	
-	// Create menu items
-	showWindow := systray.AddMenuItem("Show Window", "Show the main window")
-	systray.AddSeparator()
-	settings := systray.AddMenuItem("Settings...", "Configure hotkey")
-	systray.AddSeparator()
-	instructions := systray.AddMenuItem("Instructions", "Keyboard shortcuts and usage")
-	systray.AddSeparator()
-	quit := systray.AddMenuItem("Quit", "Exit SnapLog")
-	
-	// Signal that system tray is ready
-	a.systrayReady <- true
-	
-	// Handle menu clicks
-	go func() {
-		for {
-			select {
-			case <-showWindow.ClickedCh:
-				a.ShowWindow()
-			case <-settings.ClickedCh:
-				a.OpenSettings()
-			case <-instructions.ClickedCh:
-				a.ShowInstructions()
-			case <-quit.ClickedCh:
-				a.Quit()
-			}
-		}
-	}()
-}
-
-// onSystemTrayExit is called when the system tray exits
-func (a *App) onSystemTrayExit() {
-	fmt.Println("System tray exiting...")
-}
 
 // OpenSettings opens the settings modal
 func (a *App) OpenSettings() {
@@ -751,6 +716,11 @@ func (a *App) OpenSettings() {
 	a.ShowWindow()
 	// Then emit the event to open settings modal
 	wailsRuntime.EventsEmit(a.ctx, "open-settings")
+}
+
+// IsFirstRun checks if this is the first run of the app
+func (a *App) IsFirstRun() bool {
+	return a.settings.FirstRun
 }
 
 // ShowInstructions shows keyboard shortcuts and usage instructions
@@ -769,8 +739,8 @@ func (a *App) ShowInstructions() {
 	fmt.Println("  *italic*     - Italic text")
 	fmt.Println("  `code`       - Inline code")
 	fmt.Println("  - list       - Bullet lists")
-	fmt.Println("\nSystem Tray:")
-	fmt.Println("  Right-click tray icon for menu options")
+	fmt.Println("\nSettings:")
+	fmt.Println("  Type /settings or click the settings button to configure hotkey")
 	fmt.Printf("  Current hotkey: %v+%v\n", a.settings.HotkeyModifiers, a.settings.HotkeyKey)
 	fmt.Println("\n===============================")
 }
@@ -783,6 +753,8 @@ func (a *App) GetSettings() *Settings {
 // SetSettings updates the settings and saves them
 func (a *App) SetSettings(settings *Settings) error {
 	a.settings = settings
+	// Mark that setup is complete
+	a.settings.FirstRun = false
 	
 	// Save settings to file
 	if err := a.saveSettings(); err != nil {
@@ -809,7 +781,8 @@ func (a *App) loadSettings() {
 	data, err := os.ReadFile(settingsFile)
 	if err != nil {
 		// File doesn't exist or can't be read, use defaults
-		fmt.Println("Using default settings")
+		fmt.Println("Using default settings (first run)")
+		a.settings.FirstRun = true
 		return
 	}
 	
@@ -820,6 +793,12 @@ func (a *App) loadSettings() {
 	}
 	
 	a.settings = &settings
+	// If FirstRun field was not in JSON (old settings), default to true to force first run
+	// Check if the file actually contains the first_run field
+	if !strings.Contains(string(data), "first_run") {
+		fmt.Println("Old settings detected - forcing first run")
+		a.settings.FirstRun = true
+	}
 	fmt.Println("Settings loaded successfully")
 }
 

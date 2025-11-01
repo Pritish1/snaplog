@@ -29,8 +29,6 @@ func main() {
 		Bind: []interface{}{
 			app,
 		},
-		// Start hidden - only show when hotkey is pressed
-		StartHidden: true,
 		// Keep the app running in background even when window is closed
 		DisableResize: true,
 	})

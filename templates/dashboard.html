@@ -13,183 +13,329 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-            color: #333;
+            background: #f8f9fa;
+            color: #2c3e50;
+            line-height: 1.6;
         }
         
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
-            overflow: hidden;
+            padding: 20px;
         }
         
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px;
-            text-align: center;
-            position: relative;
-        }
-        
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-            opacity: 0.3;
-        }
-        
-        .header-content {
-            position: relative;
-            z-index: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #3498db;
         }
         
         .header h1 {
-            font-size: 3rem;
-            margin-bottom: 10px;
-            font-weight: 300;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
         }
         
         .header p {
-            font-size: 1.2rem;
-            opacity: 0.9;
-            font-weight: 300;
+            color: #7f8c8d;
+            font-size: 0.95rem;
+        }
+        
+        .controls {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .date-range {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .date-range label {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        
+        .date-input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            background: white;
+            color: #2c3e50;
+        }
+        
+        .date-input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+        
+        .filter-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .filter-btn:hover {
+            background: #2980b9;
+        }
+        
+        .clear-btn {
+            background: #95a5a6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .clear-btn:hover {
+            background: #7f8c8d;
+        }
+        
+        .quick-filters {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .quick-filter-btn {
+            background: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .quick-filter-btn:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+        
+        .quick-filter-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
         }
         
         .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            padding: 30px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 20px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
         }
         
-        .stat-item {
+        .stat-card {
+            background-color: #ffffff;
+            padding: 6px 12px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             text-align: center;
-            padding: 20px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            transition: transform 0.2s ease;
+            min-width: 80px;
+            flex: 1;
+            margin: 2px;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
         
-        .stat-item:hover {
+        .stat-card:hover {
             transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
         
         .stat-number {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #667eea;
-            margin-bottom: 5px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 2px;
         }
         
         .stat-label {
-            color: #666;
-            font-size: 0.9rem;
+            color: #6c757d;
+            font-size: 0.75rem;
             font-weight: 500;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
         }
         
         .content {
-            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
         }
         
         .day-group {
-            margin-bottom: 40px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .day-group:last-child {
+            border-bottom: none;
         }
         
         .day-header {
+            background: #f8f9fa;
+            padding: 16px 20px;
+            border-bottom: 1px solid #ecf0f1;
             display: flex;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e0e0e0;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .day-header:hover {
+            background: #f1f2f6;
+        }
+        
+        .day-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .day-toggle {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            transition: transform 0.2s;
+        }
+        
+        .day-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+        
+        .day-content {
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        
+        .day-content.collapsed {
+            max-height: 0;
+            opacity: 0;
         }
         
         .day-name {
-            font-size: 1.5rem;
+            font-size: 1.1rem;
             font-weight: 600;
-            color: #333;
-            margin-right: 15px;
+            color: #2c3e50;
         }
         
         .day-date {
-            font-size: 1rem;
-            color: #666;
-            background: #f0f0f0;
-            padding: 4px 12px;
-            border-radius: 20px;
+            font-size: 0.9rem;
+            color: #7f8c8d;
+            background: #ecf0f1;
+            padding: 4px 8px;
+            border-radius: 4px;
         }
         
         .day-count {
-            margin-left: auto;
-            background: #667eea;
+            background: #3498db;
             color: white;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
             font-weight: 500;
         }
         
-        .entries-grid {
-            display: grid;
-            gap: 15px;
+        .entries-container {
+            padding: 0;
         }
         
         .entry {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            border-left: 4px solid #667eea;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            transition: all 0.2s ease;
-            position: relative;
+            padding: 16px 20px;
+            border-bottom: 1px solid #f1f2f6;
+            transition: background-color 0.2s;
         }
         
         .entry:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            background: #f8f9fa;
+        }
+        
+        .entry:last-child {
+            border-bottom: none;
         }
         
         .entry-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
         }
         
         .entry-id {
-            background: #667eea;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
+            background: #ecf0f1;
+            color: #7f8c8d;
+            padding: 2px 8px;
+            border-radius: 4px;
             font-size: 0.8rem;
-            font-weight: 600;
-        }
-        
-        .entry-time {
-            color: #666;
-            font-size: 0.9rem;
             font-weight: 500;
         }
         
+        .entry-time {
+            color: #7f8c8d;
+            font-size: 0.85rem;
+        }
+        
         .entry-content {
-            color: #333;
-            line-height: 1.6;
-            word-break: break-word;
+            color: #2c3e50;
             font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        
+        .entry-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .copy-btn {
+            background: none;
+            color: #7f8c8d;
+            border: none;
+            padding: 4px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            opacity: 0.6;
+        }
+        
+        .copy-btn:hover {
+            background: #ecf0f1;
+            color: #2c3e50;
+            opacity: 1;
+        }
+        
+        .copy-btn.copied {
+            color: #27ae60;
+            opacity: 1;
         }
         
         /* Markdown content styling */
@@ -197,11 +343,11 @@
         .entry-content h4, .entry-content h5, .entry-content h6 {
             margin: 0.5em 0;
             font-weight: 600;
-            color: #333;
+            color: #2c3e50;
         }
         
-        .entry-content h1 { font-size: 1.5em; }
-        .entry-content h2 { font-size: 1.3em; }
+        .entry-content h1 { font-size: 1.3em; }
+        .entry-content h2 { font-size: 1.2em; }
         .entry-content h3 { font-size: 1.1em; }
         
         .entry-content p {
@@ -218,31 +364,34 @@
         }
         
         .entry-content code {
-            background: #f0f0f0;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: #f1f2f6;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
             font-size: 0.9em;
+            color: #e74c3c;
         }
         
         .entry-content pre {
             background: #f8f9fa;
             padding: 12px;
-            border-radius: 8px;
+            border-radius: 6px;
             overflow-x: auto;
             margin: 0.5em 0;
+            border-left: 3px solid #3498db;
         }
         
         .entry-content pre code {
             background: none;
             padding: 0;
+            color: #2c3e50;
         }
         
         .entry-content blockquote {
-            border-left: 4px solid #667eea;
-            padding-left: 16px;
+            border-left: 3px solid #3498db;
+            padding-left: 12px;
             margin: 0.5em 0;
-            color: #666;
+            color: #7f8c8d;
             font-style: italic;
         }
         
@@ -254,180 +403,556 @@
             font-style: italic;
         }
         
+        .entry-content a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        .entry-content a:hover {
+            text-decoration: underline;
+        }
+        
         .no-entries {
             text-align: center;
-            padding: 80px;
-            color: #666;
-            font-size: 1.1rem;
+            padding: 60px;
+            color: #7f8c8d;
         }
         
         .no-entries-icon {
             font-size: 3rem;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             opacity: 0.5;
         }
         
         .footer {
             text-align: center;
-            padding: 30px;
-            background: #f8f9fa;
-            color: #666;
+            padding: 20px;
+            color: #7f8c8d;
             font-size: 0.9rem;
-            border-top: 1px solid #e0e0e0;
+            margin-top: 24px;
         }
         
         .footer a {
-            color: #667eea;
+            color: #3498db;
             text-decoration: none;
-            font-weight: 500;
         }
         
         .footer a:hover {
             text-decoration: underline;
         }
         
-        .search-bar {
-            margin-bottom: 30px;
-            position: relative;
-        }
-        
-        .search-input {
-            width: 100%;
-            padding: 15px 20px;
-            border: 2px solid #e0e0e0;
-            border-radius: 25px;
-            font-size: 1rem;
-            outline: none;
-            transition: all 0.2s ease;
-        }
-        
-        .search-input:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        .search-input::placeholder {
-            color: #999;
-        }
-        
+        /* Responsive Design */
         @media (max-width: 768px) {
             .container {
-                margin: 10px;
-                border-radius: 12px;
+                padding: 12px;
             }
             
             .header {
-                padding: 30px 20px;
+                padding: 16px;
             }
             
             .header h1 {
-                font-size: 2rem;
+                font-size: 1.5rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .date-range {
+                flex-direction: column;
+                align-items: stretch;
             }
             
             .stats {
                 grid-template-columns: 1fr;
-                padding: 20px;
-            }
-            
-            .content {
-                padding: 20px;
             }
             
             .day-header {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 10px;
+                gap: 8px;
             }
             
-            .day-count {
-                margin-left: 0;
+            .day-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+            
+            .entry-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
             }
         }
         
+        /* Loading and empty states */
         .loading {
             text-align: center;
             padding: 40px;
-            color: #666;
+            color: #7f8c8d;
         }
         
         .spinner {
             border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
+            border-top: 3px solid #3498db;
             border-radius: 50%;
             width: 30px;
             height: 30px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+            margin: 0 auto 16px;
         }
         
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Copy feedback */
+        .copy-feedback {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #27ae60;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+        }
+        
+        .copy-feedback.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        /* Filter results info */
+        .filter-info {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 4px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            color: #0c5460;
+            font-size: 0.9rem;
+        }
+        
+        .filter-info strong {
+            color: #0c5460;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div class="header-content">
-                <h1>SnapLog Dashboard</h1>
-                <p>Your personal knowledge repository</p>
+            <h1>SnapLog Dashboard</h1>
+            <p>Your personal knowledge repository</p>
+        </div>
+        
+        <div class="controls">
+            <div class="date-range">
+                <label for="start-date">From:</label>
+                <input type="date" id="start-date" class="date-input">
+                <label for="end-date">To:</label>
+                <input type="date" id="end-date" class="date-input">
+                <button class="filter-btn" onclick="filterByDate()">Filter</button>
+                <button class="clear-btn" onclick="clearFilter()">Clear</button>
+            </div>
+            <div class="quick-filters">
+                <button class="quick-filter-btn" onclick="setQuickFilter('today')">Today</button>
+                <button class="quick-filter-btn" onclick="setQuickFilter('week')">This Week</button>
+                <button class="quick-filter-btn" onclick="setQuickFilter('month')">This Month</button>
             </div>
         </div>
         
         <div class="stats">
-            <div class="stat-item">
-                <div class="stat-number">{{.TotalEntries}}</div>
+            <div class="stat-card">
+                <div class="stat-number" id="total-entries">{{.TotalEntries}}</div>
                 <div class="stat-label">Total Entries</div>
             </div>
-            <div class="stat-item">
-                <div class="stat-number">{{.TotalDays}}</div>
+            <div class="stat-card">
+                <div class="stat-number" id="total-days">{{.TotalDays}}</div>
                 <div class="stat-label">Active Days</div>
             </div>
-            <div class="stat-item">
-                <div class="stat-number">{{.ThisWeek}}</div>
+            <div class="stat-card">
+                <div class="stat-number" id="this-week">{{.ThisWeek}}</div>
                 <div class="stat-label">This Week</div>
             </div>
-            <div class="stat-item">
-                <div class="stat-number">{{.Generated}}</div>
-                <div class="stat-label">Generated</div>
+            <div class="stat-card">
+                <div class="stat-number" id="filtered-count">{{.TotalEntries}}</div>
+                <div class="stat-label">Showing</div>
             </div>
         </div>
         
         <div class="content">
-            {{if .DayGroups}}
-                {{range .DayGroups}}
-                <div class="day-group">
-                    <div class="day-header">
-                        <div class="day-name">{{.DayName}}</div>
-                        <div class="day-date">{{.Date}}</div>
-                        <div class="day-count">{{.Count}} entries</div>
-                    </div>
-                    
-                    <div class="entries-grid">
-                        {{range .Entries}}
-                        <div class="entry">
-                            <div class="entry-header">
-                                <span class="entry-id">#{{.ID}}</span>
-                                <span class="entry-time">{{.LocalTime}}</span>
+            <div id="filter-info" class="filter-info" style="display: none;">
+                <strong>Filtered results:</strong> <span id="filter-details"></span>
+            </div>
+            
+            <div id="entries-container">
+                {{if .DayGroups}}
+                    {{range .DayGroups}}
+                    <div class="day-group" data-date="{{.Date}}">
+                        <div class="day-header" onclick="toggleDay('{{.Date}}')">
+                            <div class="day-info">
+                                <span class="day-toggle" id="toggle-{{.Date}}">▼</span>
+                                <div class="day-name">{{.DayName}}</div>
+                                <div class="day-date" data-iso-date="{{.Date}}">{{.Date}}</div>
                             </div>
-                            <div class="entry-content">{{.RenderedHTML}}</div>
+                            <div class="day-count">{{.Count}} entries</div>
                         </div>
-                        {{end}}
+                        
+                        <div class="day-content" id="content-{{.Date}}">
+                            <div class="entries-container">
+                                {{range .Entries}}
+                                <div class="entry" data-date="{{.DateString}}">
+                                    <div class="entry-header">
+                                        <span class="entry-id">#{{.ID}}</span>
+                                        <span class="entry-time">{{.LocalTime}}</span>
+                                    </div>
+                                    <div class="entry-content">{{.RenderedHTML}}</div>
+                                    <div class="entry-actions">
+                                        <button class="copy-btn" onclick="copyToClipboard('{{.ID}}')" title="Copy text">📋</button>
+                                    </div>
+                                </div>
+                                {{end}}
+                            </div>
+                        </div>
                     </div>
-                </div>
+                    {{end}}
+                {{else}}
+                    <div class="no-entries">
+                        <div class="no-entries-icon">📝</div>
+                        <p>No entries found. Start logging your thoughts!</p>
+                    </div>
                 {{end}}
-            {{else}}
-                <div class="no-entries">
-                    <div class="no-entries-icon">📝</div>
-                    <p>No entries found. Start logging your thoughts!</p>
-                </div>
-            {{end}}
+            </div>
         </div>
         
         <div class="footer">
             <p>Generated on {{.Generated}} | <a href="#" onclick="window.location.reload()">Refresh</a> | SnapLog Dashboard</p>
         </div>
     </div>
+    
+    <div class="copy-feedback" id="copy-feedback">Copied to clipboard!</div>
+    
+    <script>
+        // Store original data for filtering
+        const originalData = {
+            totalEntries: {{.TotalEntries}},
+            totalDays: {{.TotalDays}},
+            thisWeek: {{.ThisWeek}},
+            dayGroups: [
+                {{range .DayGroups}}
+                {
+                    dayName: "{{.DayName}}",
+                    date: "{{.Date}}",
+                    count: {{.Count}},
+                    entries: [
+                        {{range .Entries}}
+                        {
+                            id: {{.ID}},
+                            content: `{{.RenderedHTML}}`,
+                            localTime: "{{.LocalTime}}",
+                            date: "{{.DateString}}"
+                        },
+                        {{end}}
+                    ]
+                },
+                {{end}}
+            ]
+        };
+        
+        function filterByDate() {
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            
+            console.log('Filtering by date range:', startDate, 'to', endDate);
+            console.log('Available entries:', originalData.dayGroups.map(dg => ({ date: dg.date, count: dg.count })));
+            
+            if (!startDate && !endDate) {
+                clearFilter();
+                return;
+            }
+            
+            const start = startDate ? new Date(startDate) : new Date('1900-01-01');
+            const end = endDate ? new Date(endDate) : new Date('2100-12-31');
+            
+            console.log('Parsed dates:', start, 'to', end);
+            
+            let filteredCount = 0;
+            let filteredDays = 0;
+            
+            // Filter day groups
+            const filteredDayGroups = originalData.dayGroups.filter(dayGroup => {
+                const dayDate = new Date(dayGroup.date);
+                console.log('Checking day:', dayGroup.date, 'against range:', start, 'to', end);
+                if (dayDate >= start && dayDate <= end) {
+                    // Filter entries within this day
+                    const filteredEntries = dayGroup.entries.filter(entry => {
+                        const entryDate = new Date(entry.date);
+                        return entryDate >= start && entryDate <= end;
+                    });
+                    
+                    if (filteredEntries.length > 0) {
+                        filteredCount += filteredEntries.length;
+                        filteredDays++;
+                        dayGroup.entries = filteredEntries;
+                        dayGroup.count = filteredEntries.length;
+                        return true;
+                    }
+                }
+                return false;
+            });
+            
+            console.log('Filtered results:', filteredCount, 'entries from', filteredDays, 'days');
+            
+            // Update display
+            updateDisplay(filteredDayGroups, filteredCount, filteredDays);
+            
+            // Show filter info
+            const filterInfo = document.getElementById('filter-info');
+            const filterDetails = document.getElementById('filter-details');
+            filterDetails.textContent = `${filteredCount} entries from ${filteredDays} days`;
+            filterInfo.style.display = 'block';
+        }
+        
+        function setQuickFilter(type) {
+            const today = new Date();
+            const startDateInput = document.getElementById('start-date');
+            const endDateInput = document.getElementById('end-date');
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.quick-filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Add active class to clicked button
+            event.target.classList.add('active');
+            
+            switch(type) {
+                case 'today':
+                    const todayStr = today.toISOString().split('T')[0];
+                    startDateInput.value = todayStr;
+                    endDateInput.value = todayStr;
+                    console.log('Today filter set to:', todayStr);
+                    break;
+                case 'week':
+                    const weekStart = new Date(today);
+                    weekStart.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
+                    const weekEnd = new Date(weekStart);
+                    weekEnd.setDate(weekStart.getDate() + 6); // End of week (Saturday)
+                    startDateInput.value = weekStart.toISOString().split('T')[0];
+                    endDateInput.value = weekEnd.toISOString().split('T')[0];
+                    console.log('Week filter set to:', weekStart.toISOString().split('T')[0], 'to', weekEnd.toISOString().split('T')[0]);
+                    break;
+                case 'month':
+                    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    startDateInput.value = monthStart.toISOString().split('T')[0];
+                    endDateInput.value = monthEnd.toISOString().split('T')[0];
+                    console.log('Month filter set to:', monthStart.toISOString().split('T')[0], 'to', monthEnd.toISOString().split('T')[0]);
+                    break;
+            }
+            
+            // Apply the filter
+            filterByDate();
+        }
+        
+        function clearFilter() {
+            // Reset date inputs
+            document.getElementById('start-date').value = '';
+            document.getElementById('end-date').value = '';
+            
+            // Remove active class from all quick filter buttons
+            document.querySelectorAll('.quick-filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Hide filter info
+            document.getElementById('filter-info').style.display = 'none';
+            
+            // Restore original display
+            updateDisplay(originalData.dayGroups, originalData.totalEntries, originalData.totalDays);
+        }
+        
+        function updateDisplay(dayGroups, totalCount, totalDays) {
+            // Update stats
+            document.getElementById('total-entries').textContent = originalData.totalEntries;
+            document.getElementById('total-days').textContent = originalData.totalDays;
+            document.getElementById('this-week').textContent = originalData.thisWeek;
+            document.getElementById('filtered-count').textContent = totalCount;
+            
+            // Update entries container
+            const container = document.getElementById('entries-container');
+            
+            if (dayGroups.length === 0) {
+                container.innerHTML = `
+                    <div class="no-entries">
+                        <div class="no-entries-icon">🔍</div>
+                        <p>No entries found for the selected date range.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            dayGroups.forEach(dayGroup => {
+                html += `
+                    <div class="day-group" data-date="${dayGroup.date}">
+                        <div class="day-header" onclick="toggleDay('${dayGroup.date}')">
+                            <div class="day-info">
+                                <span class="day-toggle" id="toggle-${dayGroup.date}">▼</span>
+                                <div class="day-name">${dayGroup.dayName}</div>
+                                <div class="day-date">${dayGroup.date}</div>
+                            </div>
+                            <div class="day-count">${dayGroup.count} entries</div>
+                        </div>
+                        <div class="day-content" id="content-${dayGroup.date}">
+                            <div class="entries-container">
+                `;
+                
+                dayGroup.entries.forEach(entry => {
+                    html += `
+                        <div class="entry" data-date="${entry.date}">
+                            <div class="entry-header">
+                                <span class="entry-id">#${entry.id}</span>
+                                <span class="entry-time">${entry.localTime}</span>
+                            </div>
+                            <div class="entry-content">${entry.content}</div>
+                            <div class="entry-actions">
+                                <button class="copy-btn" onclick="copyToClipboard('${entry.id}')" title="Copy text">📋</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function copyToClipboard(entryId) {
+            // Find the entry content by looking for the entry with this ID
+            const entries = document.querySelectorAll('.entry');
+            let targetEntry = null;
+            
+            for (let entry of entries) {
+                const entryIdElement = entry.querySelector('.entry-id');
+                if (entryIdElement && entryIdElement.textContent === `#${entryId}`) {
+                    targetEntry = entry;
+                    break;
+                }
+            }
+            
+            if (!targetEntry) {
+                console.error('Entry not found:', entryId);
+                return;
+            }
+            
+            const contentElement = targetEntry.querySelector('.entry-content');
+            if (!contentElement) {
+                console.error('Content element not found');
+                return;
+            }
+            
+            // Get text content (strip HTML)
+            const textContent = contentElement.textContent || contentElement.innerText;
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(textContent).then(() => {
+                showCopyFeedback();
+                // Visual feedback on the button
+                const copyBtn = targetEntry.querySelector('.copy-btn');
+                if (copyBtn) {
+                    copyBtn.classList.add('copied');
+                    setTimeout(() => {
+                        copyBtn.classList.remove('copied');
+                    }, 2000);
+                }
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = textContent;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showCopyFeedback();
+            });
+        }
+        
+        function toggleDay(dateKey) {
+            const toggle = document.getElementById(`toggle-${dateKey}`);
+            const content = document.getElementById(`content-${dateKey}`);
+            
+            if (!toggle || !content) return;
+            
+            if (content.classList.contains('collapsed')) {
+                // Expand
+                content.classList.remove('collapsed');
+                toggle.classList.remove('collapsed');
+                toggle.textContent = '▼';
+            } else {
+                // Collapse
+                content.classList.add('collapsed');
+                toggle.classList.add('collapsed');
+                toggle.textContent = '▶';
+            }
+        }
+        
+        function showCopyFeedback() {
+            const feedback = document.getElementById('copy-feedback');
+            feedback.classList.add('show');
+            setTimeout(() => {
+                feedback.classList.remove('show');
+            }, 2000);
+        }
+        
+        function formatDateForDisplay(isoDate) {
+            const date = new Date(isoDate);
+            return date.toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                year: 'numeric' 
+            });
+        }
+        
+        // Set default date range to last 7 days
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Dashboard loaded with data:', originalData);
+            console.log('Available day groups:', originalData.dayGroups.map(dg => ({ 
+                dayName: dg.dayName, 
+                date: dg.date, 
+                count: dg.count,
+                entryDates: dg.entries.map(e => e.date)
+            })));
+            
+            // Format all day dates for display
+            document.querySelectorAll('.day-date[data-iso-date]').forEach(element => {
+                const isoDate = element.getAttribute('data-iso-date');
+                element.textContent = formatDateForDisplay(isoDate);
+            });
+            
+            const today = new Date();
+            const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+            
+            document.getElementById('end-date').value = today.toISOString().split('T')[0];
+            document.getElementById('start-date').value = lastWeek.toISOString().split('T')[0];
+            
+            // Apply initial filter
+            filterByDate();
+        });
+    </script>
 </body>
 </html>

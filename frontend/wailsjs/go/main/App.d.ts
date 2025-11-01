@@ -4,6 +4,8 @@ import {main} from '../models';
 
 export function CheckAccessibilityPermissions():Promise<boolean>;
 
+export function ClearAllData():Promise<void>;
+
 export function GetDatabasePath():Promise<string>;
 
 export function GetLogEntries(arg1:number):Promise<Array<main.LogEntry>>;
@@ -13,6 +15,8 @@ export function GetLogEntriesCount():Promise<number>;
 export function GetSettings():Promise<main.Settings>;
 
 export function HideWindow():Promise<void>;
+
+export function IsFirstRun():Promise<boolean>;
 
 export function LogText(arg1:string):Promise<void>;
 

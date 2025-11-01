@@ -1,6 +1,6 @@
 import {useState, useEffect} from 'react';
 import './App.css';
-import {LogText, HideWindow, Quit, GetSettings, SetSettings, RenderMarkdown, ProcessCommand} from "../wailsjs/go/main/App";
+import {LogText, HideWindow, Quit, GetSettings, SetSettings, RenderMarkdown, ProcessCommand, ClearAllData} from "../wailsjs/go/main/App";
 import {EventsOn} from "../wailsjs/runtime/runtime";
 
 function App() {
@@ -8,25 +8,63 @@ function App() {
     const [showSettings, setShowSettings] = useState(false);
     const [previewMode, setPreviewMode] = useState(false);
     const [renderedHtml, setRenderedHtml] = useState('');
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [settings, setSettings] = useState({
         hotkey_modifiers: ['ctrl', 'shift'],
-        hotkey_key: 'l'
+        hotkey_key: 'l',
+        theme: 'dark'
     });
     const [tempSettings, setTempSettings] = useState({
         hotkey_modifiers: ['ctrl', 'shift'],
-        hotkey_key: 'l'
+        hotkey_key: 'l',
+        theme: 'dark'
     });
 
     useEffect(() => {
         // Load settings
         GetSettings().then(setSettings);
         
-        // Listen for open-settings event from system menu
+        // Listen for open-settings event
         EventsOn("open-settings", () => {
-            setTempSettings({...settings});
-            setShowSettings(true);
+            // Reload settings to get current values
+            GetSettings().then(currentSettings => {
+                setSettings(currentSettings);
+                setTempSettings({...currentSettings});
+                setShowSettings(true);
+            });
         });
-    }, []);
+
+        // Listen for first-run setup
+        EventsOn("show-first-run-setup", () => {
+            // Reload settings to get current values
+            GetSettings().then(currentSettings => {
+                setSettings(currentSettings);
+                setTempSettings({...currentSettings});
+                setShowSettings(true);
+            });
+        });
+
+        // Global key listener for Esc key
+        const handleGlobalKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                // Close settings modal if open
+                if (showSettings) {
+                    setShowSettings(false);
+                    return;
+                }
+                // Otherwise hide window
+                HideWindow();
+            }
+        };
+
+        // Add global event listener
+        document.addEventListener('keydown', handleGlobalKeyDown);
+
+        // Cleanup
+        return () => {
+            document.removeEventListener('keydown', handleGlobalKeyDown);
+        };
+    }, [showSettings]);
 
     const handleTextChange = (e) => setText(e.target.value);
 
@@ -38,12 +76,15 @@ function App() {
         // Check for slash commands
         if (text.trim().startsWith('/')) {
             try {
-                await ProcessCommand(text.trim());
+                const command = text.trim();
+                await ProcessCommand(command);
                 setText(''); // Clear the input
-                // Hide the window immediately
-                setTimeout(() => {
-                    HideWindow();
-                }, 100);
+                // Don't hide window for settings command
+                if (command !== '/settings') {
+                    setTimeout(() => {
+                        HideWindow();
+                    }, 100);
+                }
                 return;
             } catch (error) {
                 console.error('Error processing command:', error);
@@ -131,11 +172,33 @@ function App() {
         return `${modStr}+${key.toUpperCase()}`;
     };
 
+    const handleDeleteAll = async () => {
+        try {
+            await ClearAllData();
+            setShowDeleteConfirm(false);
+        } catch (error) {
+            console.error('Error deleting all data:', error);
+        }
+    };
+
     return (
-        <div id="App">
+        <div id="App" className={settings.theme === 'light' ? 'theme-light' : 'theme-dark'}>
             <div className="header">
-                <h1>SnapLog CLI</h1>
-                <p className="subtitle">Ctrl+Tab: Preview | Esc: Exit</p>
+                <div style={{display: 'flex', gap: '4px', alignItems: 'center'}}>
+                    <button 
+                        className="settings-btn"
+                        onClick={async () => {
+                            const currentSettings = await GetSettings();
+                            setSettings(currentSettings);
+                            setTempSettings({...currentSettings});
+                            setShowSettings(true);
+                        }}
+                        title="Settings"
+                    >
+                        ⚙️
+                    </button>
+                    <p className="subtitle">Ctrl+Tab: Preview | Esc: Exit</p>
+                </div>
             </div>
             
             <div className="input-container">
@@ -184,11 +247,11 @@ function App() {
                         </div>
                         
                         <div className="modal-body">
+                            {/* Hotkey Configuration - Compact */}
                             <div className="setting-group">
-                                <label>Hotkey Configuration</label>
-                                <div className="hotkey-config">
-                                    <div className="modifiers">
-                                        <label>Modifiers:</label>
+                                <label>Hotkey</label>
+                                <div className="hotkey-config-compact">
+                                    <div className="modifiers-compact">
                                         {['ctrl', 'alt', 'shift'].map(modifier => (
                                             <label key={modifier} className="checkbox-label">
                                                 <input
@@ -200,9 +263,7 @@ function App() {
                                             </label>
                                         ))}
                                     </div>
-                                    
-                                    <div className="key-selection">
-                                        <label>Key:</label>
+                                    <div className="key-selection-compact">
                                         <select 
                                             value={tempSettings.hotkey_key}
                                             onChange={(e) => setTempSettings({...tempSettings, hotkey_key: e.target.value})}
@@ -214,11 +275,79 @@ function App() {
                                             <option value="space">Space</option>
                                         </select>
                                     </div>
-                                    
-                                    <div className="hotkey-preview">
-                                        <strong>Preview:</strong> {formatHotkey(tempSettings.hotkey_modifiers, tempSettings.hotkey_key)}
+                                    <div className="hotkey-preview-compact">
+                                        {formatHotkey(tempSettings.hotkey_modifiers, tempSettings.hotkey_key)}
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Theme Selection */}
+                            <div className="setting-group">
+                                <label>Theme</label>
+                                <div className="theme-toggle">
+                                    <label className="radio-label">
+                                        <input
+                                            type="radio"
+                                            name="theme"
+                                            checked={tempSettings.theme === 'dark'}
+                                            onChange={() => setTempSettings({...tempSettings, theme: 'dark'})}
+                                        />
+                                        Dark
+                                    </label>
+                                    <label className="radio-label">
+                                        <input
+                                            type="radio"
+                                            name="theme"
+                                            checked={tempSettings.theme === 'light'}
+                                            onChange={() => setTempSettings({...tempSettings, theme: 'light'})}
+                                        />
+                                        Light
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Instructions */}
+                            <div className="setting-group">
+                                <label>Instructions</label>
+                                <div className="instructions-box">
+                                    <div className="instructions-item">
+                                        <strong>Ctrl+Tab:</strong> Toggle preview
+                                    </div>
+                                    <div className="instructions-item">
+                                        <strong>Enter:</strong> Log and hide
+                                    </div>
+                                    <div className="instructions-item">
+                                        <strong>Shift+Enter:</strong> New line
+                                    </div>
+                                    <div className="instructions-item">
+                                        <strong>Esc:</strong> Hide window
+                                    </div>
+                                    <div className="instructions-item">
+                                        <strong>/dash:</strong> Open dashboard
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Delete All Data */}
+                            <div className="setting-group">
+                                <label>Danger Zone</label>
+                                {!showDeleteConfirm ? (
+                                    <button className="danger-btn" onClick={() => setShowDeleteConfirm(true)}>
+                                        Delete All Logged Data
+                                    </button>
+                                ) : (
+                                    <div className="delete-confirm">
+                                        <p>Are you sure? This cannot be undone.</p>
+                                        <div className="delete-actions">
+                                            <button className="danger-btn-confirm" onClick={handleDeleteAll}>
+                                                Yes, Delete All
+                                            </button>
+                                            <button className="cancel-delete" onClick={() => setShowDeleteConfirm(false)}>
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         

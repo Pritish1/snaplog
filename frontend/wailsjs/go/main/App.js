@@ -6,6 +6,10 @@ export function CheckAccessibilityPermissions() {
   return window['go']['main']['App']['CheckAccessibilityPermissions']();
 }
 
+export function ClearAllData() {
+  return window['go']['main']['App']['ClearAllData']();
+}
+
 export function GetDatabasePath() {
   return window['go']['main']['App']['GetDatabasePath']();
 }
@@ -24,6 +28,10 @@ export function GetSettings() {
 
 export function HideWindow() {
   return window['go']['main']['App']['HideWindow']();
+}
+
+export function IsFirstRun() {
+  return window['go']['main']['App']['IsFirstRun']();
 }
 
 export function LogText(arg1) {

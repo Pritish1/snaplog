@@ -38,6 +38,8 @@ export namespace main {
 	export class Settings {
 	    hotkey_modifiers: string[];
 	    hotkey_key: string;
+	    first_run: boolean;
+	    theme: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -47,6 +49,8 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.hotkey_modifiers = source["hotkey_modifiers"];
 	        this.hotkey_key = source["hotkey_key"];
+	        this.first_run = source["first_run"];
+	        this.theme = source["theme"];
 	    }
 	}
 
