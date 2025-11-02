@@ -789,6 +789,15 @@ func (a *App) RenderMarkdown(markdown string) (string, error) {
 
 // ShowWindow brings the app window to the front
 func (a *App) ShowWindow() {
+	// On macOS, minimized windows can cause screen switching when unminimized.
+	// To prevent this, we center the window on the current screen before showing/unminimizing.
+	// This ensures it appears on the current screen rather than the screen where it was minimized.
+	if runtime.GOOS == "darwin" {
+		// Center on the current screen - this ensures the window appears on the current screen
+		// rather than switching to the screen where it was minimized
+		wailsRuntime.WindowCenter(a.ctx)
+	}
+	
 	wailsRuntime.WindowShow(a.ctx)
 	wailsRuntime.WindowUnminimise(a.ctx)
 }
