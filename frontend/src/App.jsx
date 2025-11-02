@@ -10,8 +10,12 @@ function App() {
     const [previewMode, setPreviewMode] = useState(false);
     const [renderedHtml, setRenderedHtml] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteSuccess, setDeleteSuccess] = useState(false);
     const [databasePath, setDatabasePath] = useState('');
     const [dashboardPath, setDashboardPath] = useState('');
+    
+    // Detect macOS
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0 || navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
     const [settings, setSettings] = useState({
         hotkey_modifiers: ['ctrl', 'shift'],
         hotkey_key: 'l',
@@ -124,15 +128,16 @@ function App() {
         if (e.key === 'Escape') {
             // Hide window without saving
             HideWindow();
-        } else if (e.key === 'Tab' && e.ctrlKey) {
-            // Ctrl+Tab to toggle preview mode
+        } else if (e.key === 'Tab' && (e.ctrlKey || e.metaKey)) {
+            // Ctrl+Tab (Windows/Linux) or Cmd+Tab (macOS) to toggle preview mode
             e.preventDefault();
             togglePreviewMode();
         }
     };
 
     const togglePreviewMode = async () => {
-        if (!previewMode && text.trim()) {
+        const newPreviewMode = !previewMode;
+        if (newPreviewMode && text.trim()) {
             // Render Markdown when switching to preview mode
             try {
                 const html = await RenderMarkdown(text);
@@ -142,7 +147,7 @@ function App() {
                 setRenderedHtml('<p>Error rendering markdown</p>');
             }
         }
-        setPreviewMode(!previewMode);
+        setPreviewMode(newPreviewMode);
     };
 
     const saveSettings = async () => {
@@ -169,22 +174,38 @@ function App() {
     const formatHotkey = (modifiers, key) => {
         const modStr = modifiers.map(m => {
             switch(m) {
-                case 'ctrl': return 'Ctrl';
+                case 'ctrl': return isMac ? 'Cmd' : 'Ctrl';
                 case 'cmd': return 'Cmd';
-                case 'alt': return 'Alt';
+                case 'alt': return isMac ? 'Option' : 'Alt';
                 case 'shift': return 'Shift';
                 default: return m;
             }
         }).join('+');
         return `${modStr}+${key.toUpperCase()}`;
     };
+    
+    const getModifierLabel = (modifier) => {
+        switch(modifier) {
+            case 'ctrl': return isMac ? 'Cmd' : 'Ctrl';
+            case 'cmd': return 'Cmd';
+            case 'alt': return isMac ? 'Option' : 'Alt';
+            case 'shift': return 'Shift';
+            default: return modifier.charAt(0).toUpperCase() + modifier.slice(1);
+        }
+    };
 
     const handleDeleteAll = async () => {
         try {
             await ClearAllData();
             setShowDeleteConfirm(false);
+            setDeleteSuccess(true);
+            // Reset success message after 3 seconds
+            setTimeout(() => {
+                setDeleteSuccess(false);
+            }, 3000);
         } catch (error) {
             console.error('Error deleting all data:', error);
+            setShowDeleteConfirm(false);
         }
     };
 
@@ -211,7 +232,7 @@ function App() {
                     >
                         ⚙️
                     </button>
-                    <p className="subtitle">Ctrl+Tab: Preview | Esc: Exit</p>
+                    <p className="subtitle">{isMac ? 'Cmd+Tab' : 'Ctrl+Tab'}: Preview | Esc: Exit</p>
                 </div>
             </div>
             
@@ -223,7 +244,7 @@ function App() {
                     <button 
                         className="preview-toggle"
                         onClick={togglePreviewMode}
-                        title="Toggle Preview (Ctrl+Tab)"
+                        title={`Toggle Preview (${isMac ? 'Cmd+Tab' : 'Ctrl+Tab'})`}
                     >
                         {previewMode ? 'Edit' : 'Preview'}
                     </button>
@@ -273,7 +294,7 @@ function App() {
                                                     checked={tempSettings.hotkey_modifiers.includes(modifier)}
                                                     onChange={() => toggleModifier(modifier)}
                                                 />
-                                                {modifier.charAt(0).toUpperCase() + modifier.slice(1)}
+                                                {getModifierLabel(modifier)}
                                             </label>
                                         ))}
                                     </div>
@@ -323,7 +344,11 @@ function App() {
                             {/* Delete All Data */}
                             <div className="setting-group">
                                 <label>Danger Zone</label>
-                                {!showDeleteConfirm ? (
+                                {deleteSuccess ? (
+                                    <div className="delete-success">
+                                        <p style={{color: '#27ae60', margin: 0}}>✓ All data deleted successfully</p>
+                                    </div>
+                                ) : !showDeleteConfirm ? (
                                     <button className="danger-btn" onClick={() => setShowDeleteConfirm(true)}>
                                         Delete All Logged Data
                                     </button>
@@ -365,7 +390,7 @@ function App() {
                                 <h3>Keyboard Shortcuts</h3>
                                 <div className="instructions-list">
                                     <div className="instruction-item">
-                                        <strong>Ctrl+Tab:</strong> Toggle between Edit and Preview mode
+                                        <strong>{isMac ? 'Cmd+Tab' : 'Ctrl+Tab'}:</strong> Toggle between Edit and Preview mode
                                     </div>
                                     <div className="instruction-item">
                                         <strong>Enter:</strong> Log text and hide window
@@ -387,9 +412,6 @@ function App() {
                                     </div>
                                     <div className="instruction-item">
                                         <code>/settings</code> - Open settings window
-                                    </div>
-                                    <div className="instruction-item">
-                                        <code>/help</code> - Show help in console
                                     </div>
                                 </div>
                             </div>

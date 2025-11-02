@@ -252,46 +252,12 @@ func (a *App) ProcessCommand(command string) error {
 	case "/settings":
 		a.OpenSettings()
 		return nil
-	case "/help":
-		return a.showHelp()
-	case "/stats":
-		return a.showStats()
 	default:
-		return fmt.Errorf("unknown command: %s. Type /help for available commands", command)
+		return fmt.Errorf("unknown command: %s. Available commands: /dash, /settings, /stats", command)
 	}
 }
 
-// showHelp displays available commands
-func (a *App) showHelp() error {
-	fmt.Println("\n=== SnapLog CLI Commands ===")
-	fmt.Println("\nAvailable Commands:")
-	fmt.Println("  /dash     - Generate HTML dashboard and open in browser")
-	fmt.Println("  /settings - Open settings to configure hotkey")
-	fmt.Println("  /help     - Show this help message")
-	fmt.Println("  /stats    - Show database statistics")
-	fmt.Println("\nKeyboard Shortcuts:")
-	fmt.Println("  Enter        - Log text and hide window")
-	fmt.Println("  Shift+Enter  - Create a new line")
-	fmt.Println("  Ctrl+Tab     - Toggle Markdown preview")
-	fmt.Println("  Esc          - Hide window without saving")
-	fmt.Println("\n=============================")
-	return nil
-}
 
-// showStats displays database statistics
-func (a *App) showStats() error {
-	count, err := a.GetLogEntriesCount()
-	if err != nil {
-		return fmt.Errorf("failed to get log count: %v", err)
-	}
-	
-	fmt.Printf("\n=== SnapLog Statistics ===\n")
-	fmt.Printf("Total entries: %d\n", count)
-	fmt.Printf("Database: %s\n", a.GetDatabasePath())
-	fmt.Printf("Hotkey: %v+%v\n", a.settings.HotkeyModifiers, a.settings.HotkeyKey)
-	fmt.Printf("========================\n")
-	return nil
-}
 
 // LogText saves text to the SQLite database with timestamp
 func (a *App) LogText(text string) error {
@@ -557,11 +523,15 @@ func (a *App) calculateThisWeekCount(entries []LogEntry) int {
 
 // generateHTMLFromTemplate generates HTML from the template file
 func (a *App) generateHTMLFromTemplate(data *DisplayDashboardData) (string, error) {
-	// Read template file
-	templatePath := filepath.Join(".", "templates", "dashboard.html")
-	templateContent, err := os.ReadFile(templatePath)
+	// Try to read from embedded FS first (for binary builds)
+	templateContent, err := templates.ReadFile("templates/dashboard.html")
 	if err != nil {
-		return "", fmt.Errorf("failed to read template file: %v", err)
+		// Fallback to file system (for dev mode)
+		templatePath := filepath.Join(".", "templates", "dashboard.html")
+		templateContent, err = os.ReadFile(templatePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read template file: %v", err)
+		}
 	}
 	
 	// Parse template
