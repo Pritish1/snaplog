@@ -10,8 +10,16 @@ export function ClearAllData() {
   return window['go']['main']['App']['ClearAllData']();
 }
 
+export function GetDashboardPath() {
+  return window['go']['main']['App']['GetDashboardPath']();
+}
+
 export function GetDatabasePath() {
   return window['go']['main']['App']['GetDatabasePath']();
+}
+
+export function GetEntriesByTags(arg1, arg2) {
+  return window['go']['main']['App']['GetEntriesByTags'](arg1, arg2);
 }
 
 export function GetLogEntries(arg1) {
@@ -24,6 +32,10 @@ export function GetLogEntriesCount() {
 
 export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
+}
+
+export function GetTags() {
+  return window['go']['main']['App']['GetTags']();
 }
 
 export function HideWindow() {

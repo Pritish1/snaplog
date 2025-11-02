@@ -265,42 +265,56 @@
         }
         
         .entries-container {
-            padding: 0;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
         
         .entry {
-            padding: 16px 20px;
-            border-bottom: 1px solid #f1f2f6;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 8px 12px;
+            border-radius: 6px;
             transition: background-color 0.2s;
+            position: relative;
+        }
+        
+        .entry::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: #e9ecef;
+            border-radius: 0 3px 3px 0;
+            opacity: 0;
+            transition: opacity 0.2s;
         }
         
         .entry:hover {
             background: #f8f9fa;
         }
         
-        .entry:last-child {
-            border-bottom: none;
-        }
-        
-        .entry-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        
-        .entry-id {
-            background: #ecf0f1;
-            color: #7f8c8d;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            font-weight: 500;
+        .entry:hover::before {
+            opacity: 1;
+            background: #3498db;
         }
         
         .entry-time {
-            color: #7f8c8d;
-            font-size: 0.85rem;
+            color: #9ca3af;
+            font-size: 0.8rem;
+            font-weight: 500;
+            white-space: nowrap;
+            margin-top: 2px;
+            min-width: 50px;
+        }
+        
+        .entry-content-wrapper {
+            flex: 1;
+            min-width: 0;
         }
         
         .entry-content {
@@ -312,7 +326,12 @@
         .entry-actions {
             display: flex;
             gap: 8px;
-            margin-top: 8px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .entry:hover .entry-actions {
+            opacity: 1;
         }
         
         .copy-btn {
@@ -481,10 +500,8 @@
                 gap: 4px;
             }
             
-            .entry-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 4px;
+            .entries-container {
+                padding: 12px;
             }
         }
         
@@ -545,6 +562,95 @@
         .filter-info strong {
             color: #0c5460;
         }
+        
+        /* Tag filter styles */
+        .tag-filter-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .tag-filter-header {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 12px;
+        }
+        
+        .tag-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .tag-select {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            background: white;
+            color: #2c3e50;
+            cursor: pointer;
+            min-width: 150px;
+        }
+        
+        .tag-select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+        
+        .tag-select option {
+            padding: 8px;
+        }
+        
+        .selected-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .tag-chip {
+            background: #3498db;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .tag-chip:hover {
+            background: #2980b9;
+        }
+        
+        .tag-remove {
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.1rem;
+            line-height: 1;
+            transition: transform 0.2s;
+        }
+        
+        .tag-remove:hover {
+            transform: scale(1.2);
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
     </style>
 </head>
 <body>
@@ -567,6 +673,19 @@
                 <button class="quick-filter-btn" onclick="setQuickFilter('today')">Today</button>
                 <button class="quick-filter-btn" onclick="setQuickFilter('week')">This Week</button>
                 <button class="quick-filter-btn" onclick="setQuickFilter('month')">This Month</button>
+            </div>
+        </div>
+        
+        <div class="tag-filter-section" id="tag-filter-section" style="display: none;">
+            <div class="tag-filter-header">Filter by Tags</div>
+            <div class="tag-selector">
+                <select id="tag-select" class="tag-select" onchange="addTag()">
+                    <option value="">Select a tag...</option>
+                    {{range .Tags}}
+                    <option value="{{.Name}}">#{{.Name}}</option>
+                    {{end}}
+                </select>
+                <div class="selected-tags" id="selected-tags"></div>
             </div>
         </div>
         
@@ -610,12 +729,11 @@
                         <div class="day-content" id="content-{{.Date}}">
                             <div class="entries-container">
                                 {{range .Entries}}
-                                <div class="entry" data-date="{{.DateString}}">
-                                    <div class="entry-header">
-                                        <span class="entry-id">#{{.ID}}</span>
-                                        <span class="entry-time">{{.LocalTime}}</span>
+                                <div class="entry" data-date="{{.DateString}}" data-id="{{.ID}}">
+                                    <div class="entry-time">{{.LocalTime}}</div>
+                                    <div class="entry-content-wrapper">
+                                        <div class="entry-content">{{.RenderedHTML}}</div>
                                     </div>
-                                    <div class="entry-content">{{.RenderedHTML}}</div>
                                     <div class="entry-actions">
                                         <button class="copy-btn" onclick="copyToClipboard('{{.ID}}')" title="Copy text">📋</button>
                                     </div>
@@ -665,8 +783,16 @@
                     ]
                 },
                 {{end}}
+            ],
+            tags: [
+                {{range .Tags}}
+                { id: {{.ID}}, name: "{{.Name}}" },
+                {{end}}
             ]
         };
+        
+        // Selected tags for filtering
+        let selectedTags = [];
         
         function filterByDate() {
             const startDate = document.getElementById('start-date').value;
@@ -675,7 +801,7 @@
             console.log('Filtering by date range:', startDate, 'to', endDate);
             console.log('Available entries:', originalData.dayGroups.map(dg => ({ date: dg.date, count: dg.count })));
             
-            if (!startDate && !endDate) {
+            if (!startDate && !endDate && selectedTags.length === 0) {
                 clearFilter();
                 return;
             }
@@ -688,8 +814,8 @@
             let filteredCount = 0;
             let filteredDays = 0;
             
-            // Filter day groups
-            const filteredDayGroups = originalData.dayGroups.filter(dayGroup => {
+            // Filter day groups by date
+            const dateFilteredDayGroups = originalData.dayGroups.filter(dayGroup => {
                 const dayDate = new Date(dayGroup.date);
                 console.log('Checking day:', dayGroup.date, 'against range:', start, 'to', end);
                 if (dayDate >= start && dayDate <= end) {
@@ -700,8 +826,6 @@
                     });
                     
                     if (filteredEntries.length > 0) {
-                        filteredCount += filteredEntries.length;
-                        filteredDays++;
                         dayGroup.entries = filteredEntries;
                         dayGroup.count = filteredEntries.length;
                         return true;
@@ -709,6 +833,26 @@
                 }
                 return false;
             });
+            
+            // Apply tag filter if tags are selected
+            const filteredDayGroups = dateFilteredDayGroups.map(dayGroup => {
+                if (selectedTags.length === 0) {
+                    return dayGroup;
+                }
+                
+                const tagFilteredEntries = dayGroup.entries.filter(entry => {
+                    return selectedTags.every(tag => entry.content.includes(`#${tag}`));
+                });
+                
+                return {
+                    ...dayGroup,
+                    entries: tagFilteredEntries,
+                    count: tagFilteredEntries.length
+                };
+            }).filter(dayGroup => dayGroup.count > 0);
+            
+            filteredCount = filteredDayGroups.reduce((sum, dg) => sum + dg.count, 0);
+            filteredDays = filteredDayGroups.length;
             
             console.log('Filtered results:', filteredCount, 'entries from', filteredDays, 'days');
             
@@ -718,7 +862,11 @@
             // Show filter info
             const filterInfo = document.getElementById('filter-info');
             const filterDetails = document.getElementById('filter-details');
-            filterDetails.textContent = `${filteredCount} entries from ${filteredDays} days`;
+            let filterText = `${filteredCount} entries from ${filteredDays} days`;
+            if (selectedTags.length > 0) {
+                filterText += ` with tags: ${selectedTags.map(t => `#${t}`).join(', ')}`;
+            }
+            filterDetails.textContent = filterText;
             filterInfo.style.display = 'block';
         }
         
@@ -774,11 +922,81 @@
                 btn.classList.remove('active');
             });
             
+            // Clear selected tags
+            selectedTags = [];
+            renderSelectedTags();
+            
             // Hide filter info
             document.getElementById('filter-info').style.display = 'none';
             
             // Restore original display
             updateDisplay(originalData.dayGroups, originalData.totalEntries, originalData.totalDays);
+        }
+        
+        function addTag() {
+            const select = document.getElementById('tag-select');
+            const tagName = select.value;
+            
+            if (tagName && !selectedTags.includes(tagName)) {
+                selectedTags.push(tagName);
+                renderSelectedTags();
+                filterByTags();
+            }
+            
+            // Reset select
+            select.value = '';
+        }
+        
+        function removeTag(tagName) {
+            selectedTags = selectedTags.filter(tag => tag !== tagName);
+            renderSelectedTags();
+            filterByTags();
+        }
+        
+        function renderSelectedTags() {
+            const container = document.getElementById('selected-tags');
+            container.innerHTML = '';
+            
+            selectedTags.forEach(tagName => {
+                const chip = document.createElement('div');
+                chip.className = 'tag-chip';
+                chip.innerHTML = `<span>#${tagName}</span><span class="tag-remove" onclick="removeTag('${tagName}')">×</span>`;
+                container.appendChild(chip);
+            });
+        }
+        
+        function filterByTags() {
+            if (selectedTags.length === 0) {
+                filterByDate();
+                return;
+            }
+            
+            // Filter entries that contain ALL selected tags
+            const filteredDayGroups = originalData.dayGroups.map(dayGroup => {
+                const filteredEntries = dayGroup.entries.filter(entry => {
+                    // Check if entry contains all selected tags
+                    return selectedTags.every(tag => {
+                        return entry.content.includes(`#${tag}`);
+                    });
+                });
+                
+                return {
+                    ...dayGroup,
+                    entries: filteredEntries,
+                    count: filteredEntries.length
+                };
+            }).filter(dayGroup => dayGroup.count > 0);
+            
+            const filteredCount = filteredDayGroups.reduce((sum, dg) => sum + dg.count, 0);
+            const filteredDays = filteredDayGroups.length;
+            
+            updateDisplay(filteredDayGroups, filteredCount, filteredDays);
+            
+            // Show filter info
+            const filterInfo = document.getElementById('filter-info');
+            const filterDetails = document.getElementById('filter-details');
+            filterDetails.textContent = `${filteredCount} entries from ${filteredDays} days with tags: ${selectedTags.map(t => `#${t}`).join(', ')}`;
+            filterInfo.style.display = 'block';
         }
         
         function updateDisplay(dayGroups, totalCount, totalDays) {
@@ -819,12 +1037,11 @@
                 
                 dayGroup.entries.forEach(entry => {
                     html += `
-                        <div class="entry" data-date="${entry.date}">
-                            <div class="entry-header">
-                                <span class="entry-id">#${entry.id}</span>
-                                <span class="entry-time">${entry.localTime}</span>
+                        <div class="entry" data-date="${entry.date}" data-id="${entry.id}">
+                            <div class="entry-time">${entry.localTime}</div>
+                            <div class="entry-content-wrapper">
+                                <div class="entry-content">${entry.content}</div>
                             </div>
-                            <div class="entry-content">${entry.content}</div>
                             <div class="entry-actions">
                                 <button class="copy-btn" onclick="copyToClipboard('${entry.id}')" title="Copy text">📋</button>
                             </div>
@@ -847,8 +1064,7 @@
             let targetEntry = null;
             
             for (let entry of entries) {
-                const entryIdElement = entry.querySelector('.entry-id');
-                if (entryIdElement && entryIdElement.textContent === `#${entryId}`) {
+                if (entry.getAttribute('data-id') === entryId) {
                     targetEntry = entry;
                     break;
                 }
@@ -943,6 +1159,11 @@
                 const isoDate = element.getAttribute('data-iso-date');
                 element.textContent = formatDateForDisplay(isoDate);
             });
+            
+            // Show tag filter section if tags exist
+            if (originalData.tags && originalData.tags.length > 0) {
+                document.getElementById('tag-filter-section').style.display = 'block';
+            }
             
             const today = new Date();
             const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);

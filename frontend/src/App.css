@@ -7,9 +7,9 @@
     --text-secondary: #666666;
     --border-color: #333333;
     --border-secondary: #222222;
-    --accent-color: #0066ff;
-    --accent-hover: #0055dd;
-    --accent-bg: #001133;
+    --accent-color: #888888;
+    --accent-hover: #aaaaaa;
+    --accent-bg: #222222;
 }
 
 #App.theme-light {
@@ -20,9 +20,9 @@
     --text-secondary: #666666;
     --border-color: #cccccc;
     --border-secondary: #aaaaaa;
-    --accent-color: #0066ff;
-    --accent-hover: #0055dd;
-    --accent-bg: #e8f0fe;
+    --accent-color: #666666;
+    --accent-hover: #444444;
+    --accent-bg: #e0e0e0;
 }
 
 #App {
@@ -66,6 +66,11 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    transition: background-color 0.3s ease;
+}
+
+.input-container:focus-within {
+    background: rgba(128, 128, 128, 0.05);
 }
 
 .input-header {
@@ -104,6 +109,25 @@
 }
 
 .view-logs-btn:hover {
+    background: var(--accent-color);
+    color: var(--bg-color);
+    box-shadow: 0 0 2px var(--accent-color);
+}
+
+.info-btn {
+    background: var(--accent-bg);
+    color: var(--accent-color);
+    border: 1px solid var(--accent-color);
+    padding: 1px 4px;
+    border-radius: 1px;
+    font-size: 0.5rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    min-height: 12px;
+}
+
+.info-btn:hover {
     background: var(--accent-color);
     color: var(--bg-color);
     box-shadow: 0 0 2px var(--accent-color);
@@ -495,6 +519,71 @@
 .cancel-delete:hover {
     background: var(--bg-secondary);
     border-color: var(--accent-color);
+}
+
+/* Instructions Modal */
+.instructions-modal {
+    max-width: 500px;
+}
+
+.instructions-body {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.instructions-section {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.instructions-section:last-child {
+    border-bottom: none;
+}
+
+.instructions-section h3 {
+    margin: 0 0 8px 0;
+    font-size: 0.75rem;
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.instructions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.instruction-item {
+    font-size: 0.65rem;
+    color: var(--text-color);
+    line-height: 1.5;
+    padding: 4px 0;
+}
+
+.instruction-item strong {
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.instruction-item code {
+    background: var(--bg-tertiary);
+    color: var(--accent-color);
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.6rem;
+    border: 1px solid var(--border-color);
+}
+
+.instruction-item code.path {
+    font-size: 0.6rem;
+    display: block;
+    margin-top: 2px;
+    word-break: break-all;
+    background: var(--bg-tertiary);
+    padding: 4px 6px;
+    border-radius: 2px;
 }
 
 .hotkey-config {

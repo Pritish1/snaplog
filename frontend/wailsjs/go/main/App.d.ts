@@ -6,13 +6,19 @@ export function CheckAccessibilityPermissions():Promise<boolean>;
 
 export function ClearAllData():Promise<void>;
 
+export function GetDashboardPath():Promise<string>;
+
 export function GetDatabasePath():Promise<string>;
+
+export function GetEntriesByTags(arg1:Array<string>,arg2:number):Promise<Array<main.LogEntry>>;
 
 export function GetLogEntries(arg1:number):Promise<Array<main.LogEntry>>;
 
 export function GetLogEntriesCount():Promise<number>;
 
 export function GetSettings():Promise<main.Settings>;
+
+export function GetTags():Promise<Array<main.Tag>>;
 
 export function HideWindow():Promise<void>;
 

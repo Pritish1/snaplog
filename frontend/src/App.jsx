@@ -1,14 +1,17 @@
 import {useState, useEffect} from 'react';
 import './App.css';
-import {LogText, HideWindow, Quit, GetSettings, SetSettings, RenderMarkdown, ProcessCommand, ClearAllData} from "../wailsjs/go/main/App";
+import {LogText, HideWindow, Quit, GetSettings, SetSettings, RenderMarkdown, ProcessCommand, ClearAllData, GetDatabasePath, GetDashboardPath} from "../wailsjs/go/main/App";
 import {EventsOn} from "../wailsjs/runtime/runtime";
 
 function App() {
     const [text, setText] = useState('');
     const [showSettings, setShowSettings] = useState(false);
+    const [showInstructions, setShowInstructions] = useState(false);
     const [previewMode, setPreviewMode] = useState(false);
     const [renderedHtml, setRenderedHtml] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [databasePath, setDatabasePath] = useState('');
+    const [dashboardPath, setDashboardPath] = useState('');
     const [settings, setSettings] = useState({
         hotkey_modifiers: ['ctrl', 'shift'],
         hotkey_key: 'l',
@@ -23,6 +26,10 @@ function App() {
     useEffect(() => {
         // Load settings
         GetSettings().then(setSettings);
+        
+        // Load file paths
+        GetDatabasePath().then(setDatabasePath);
+        GetDashboardPath().then(setDashboardPath);
         
         // Listen for open-settings event
         EventsOn("open-settings", () => {
@@ -186,6 +193,13 @@ function App() {
             <div className="header">
                 <div style={{display: 'flex', gap: '4px', alignItems: 'center'}}>
                     <button 
+                        className="info-btn"
+                        onClick={() => setShowInstructions(true)}
+                        title="Instructions"
+                    >
+                        ℹ️
+                    </button>
+                    <button 
                         className="settings-btn"
                         onClick={async () => {
                             const currentSettings = await GetSettings();
@@ -306,28 +320,6 @@ function App() {
                                 </div>
                             </div>
 
-                            {/* Instructions */}
-                            <div className="setting-group">
-                                <label>Instructions</label>
-                                <div className="instructions-box">
-                                    <div className="instructions-item">
-                                        <strong>Ctrl+Tab:</strong> Toggle preview
-                                    </div>
-                                    <div className="instructions-item">
-                                        <strong>Enter:</strong> Log and hide
-                                    </div>
-                                    <div className="instructions-item">
-                                        <strong>Shift+Enter:</strong> New line
-                                    </div>
-                                    <div className="instructions-item">
-                                        <strong>Esc:</strong> Hide window
-                                    </div>
-                                    <div className="instructions-item">
-                                        <strong>/dash:</strong> Open dashboard
-                                    </div>
-                                </div>
-                            </div>
-
                             {/* Delete All Data */}
                             <div className="setting-group">
                                 <label>Danger Zone</label>
@@ -354,6 +346,87 @@ function App() {
                         <div className="modal-footer">
                             <button className="cancel-btn" onClick={closeSettings}>Cancel</button>
                             <button className="save-btn" onClick={saveSettings}>Save Settings</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Instructions Modal */}
+            {showInstructions && (
+                <div className="modal-overlay" onClick={() => setShowInstructions(false)}>
+                    <div className="modal-content instructions-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>Instructions</h2>
+                            <button className="close-btn" onClick={() => setShowInstructions(false)}>×</button>
+                        </div>
+                        
+                        <div className="modal-body instructions-body">
+                            <div className="instructions-section">
+                                <h3>Keyboard Shortcuts</h3>
+                                <div className="instructions-list">
+                                    <div className="instruction-item">
+                                        <strong>Ctrl+Tab:</strong> Toggle between Edit and Preview mode
+                                    </div>
+                                    <div className="instruction-item">
+                                        <strong>Enter:</strong> Log text and hide window
+                                    </div>
+                                    <div className="instruction-item">
+                                        <strong>Shift+Enter:</strong> Insert new line
+                                    </div>
+                                    <div className="instruction-item">
+                                        <strong>Esc:</strong> Hide window without logging
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="instructions-section">
+                                <h3>Commands</h3>
+                                <div className="instructions-list">
+                                    <div className="instruction-item">
+                                        <code>/dash</code> - Open dashboard with all logs
+                                    </div>
+                                    <div className="instruction-item">
+                                        <code>/settings</code> - Open settings window
+                                    </div>
+                                    <div className="instruction-item">
+                                        <code>/help</code> - Show help in console
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="instructions-section">
+                                <h3>File Locations</h3>
+                                <div className="instructions-list">
+                                    <div className="instruction-item">
+                                        <strong>Database:</strong> <code className="path">{databasePath}</code>
+                                    </div>
+                                    <div className="instruction-item">
+                                        <strong>Dashboards:</strong> <code className="path">{dashboardPath}</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="instructions-section">
+                                <h3>Tips</h3>
+                                <div className="instructions-list">
+                                    <div className="instruction-item">
+                                        • Type your hotkey to quickly log thoughts
+                                    </div>
+                                    <div className="instruction-item">
+                                        • Use Markdown formatting for rich text logs
+                                    </div>
+                                    <div className="instruction-item">
+                                        • Preview before logging to check formatting
+                                    </div>
+                                    <div className="instruction-item">
+                                        • Use <code>/dash</code> to view all your logs in a web dashboard
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="modal-footer">
+                            <button className="save-btn" onClick={() => setShowInstructions(false)}>Got it!</button>
                         </div>
                     </div>
                 </div>

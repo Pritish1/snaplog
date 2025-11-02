@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -77,6 +78,7 @@ type DisplayDashboardData struct {
 	ThisWeek     int              `json:"this_week"`
 	Generated    string           `json:"generated"`
 	DayGroups    []DisplayDayGroup `json:"day_groups"`
+	Tags         []Tag             `json:"tags"`
 }
 
 
@@ -127,14 +129,8 @@ func (a *App) startup(ctx context.Context) {
 			wailsRuntime.EventsEmit(a.ctx, "show-first-run-setup")
 		}()
 	} else {
-		// For subsequent runs, show then immediately minimize to taskbar
-		// This ensures the taskbar icon is visible from first launch
-		go func() {
-			time.Sleep(100 * time.Millisecond) // Wait for window to be ready
-			wailsRuntime.WindowShow(a.ctx)
-			wailsRuntime.WindowMinimise(a.ctx)
-		}()
-		// Start hotkey detection only after initial setup
+		// For subsequent runs, just start hotkey detection
+		// Window will be visible by default (StartHidden removed)
 		go a.startHotkeyDetection()
 	}
 }
@@ -193,15 +189,57 @@ func (a *App) initDatabase() error {
 
 // createTables creates the necessary database tables
 func (a *App) createTables() error {
-	createTableSQL := `
+	// Create log_entries table
+	createEntriesTableSQL := `
 	CREATE TABLE IF NOT EXISTS log_entries (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		content TEXT NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);`
 	
-	_, err := a.db.Exec(createTableSQL)
-	return err
+	if _, err := a.db.Exec(createEntriesTableSQL); err != nil {
+		return fmt.Errorf("failed to create log_entries table: %v", err)
+	}
+	
+	// Create tags table
+	createTagsTableSQL := `
+	CREATE TABLE IF NOT EXISTS tags (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL UNIQUE,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);`
+	
+	if _, err := a.db.Exec(createTagsTableSQL); err != nil {
+		return fmt.Errorf("failed to create tags table: %v", err)
+	}
+	
+	// Create junction table for many-to-many relationship
+	createJunctionTableSQL := `
+	CREATE TABLE IF NOT EXISTS log_entries_tags (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		log_entry_id INTEGER NOT NULL,
+		tag_id INTEGER NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (log_entry_id) REFERENCES log_entries(id) ON DELETE CASCADE,
+		FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
+		UNIQUE(log_entry_id, tag_id)
+	);`
+	
+	if _, err := a.db.Exec(createJunctionTableSQL); err != nil {
+		return fmt.Errorf("failed to create log_entries_tags table: %v", err)
+	}
+	
+	// Create indexes for better query performance
+	createIndexSQL := `
+	CREATE INDEX IF NOT EXISTS idx_log_entries_tags_entry ON log_entries_tags(log_entry_id);
+	CREATE INDEX IF NOT EXISTS idx_log_entries_tags_tag ON log_entries_tags(tag_id);
+	CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);`
+	
+	if _, err := a.db.Exec(createIndexSQL); err != nil {
+		return fmt.Errorf("failed to create indexes: %v", err)
+	}
+	
+	return nil
 }
 
 // ProcessCommand handles slash commands
@@ -269,13 +307,92 @@ func (a *App) LogText(text string) error {
 
 	// Insert text into database
 	query := `INSERT INTO log_entries (content) VALUES (?)`
-	_, err := a.db.Exec(query, text)
+	result, err := a.db.Exec(query, text)
 	if err != nil {
 		return fmt.Errorf("failed to insert log entry: %v", err)
 	}
 
+	// Get the inserted entry ID
+	entryID, err := result.LastInsertId()
+	if err != nil {
+		fmt.Printf("Warning: failed to get last insert ID: %v\n", err)
+	} else {
+		// Extract and save tags
+		if err := a.processTags(entryID, text); err != nil {
+			fmt.Printf("Warning: failed to process tags: %v\n", err)
+		}
+	}
+
 	fmt.Printf("Logged text: %s\n", text)
 	return nil
+}
+
+// processTags extracts hashtags from text and creates associations
+func (a *App) processTags(entryID int64, text string) error {
+	// Extract tags using regex - matches #word, #word123, #word-word, etc.
+	// But not # at end of line or followed by special chars that can't be in tags
+	tagPattern := regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
+	matches := tagPattern.FindAllStringSubmatch(text, -1)
+	
+	if len(matches) == 0 {
+		return nil
+	}
+
+	// Process each tag
+	for _, match := range matches {
+		tagName := match[1]
+		
+		// Get or create tag
+		tagID, err := a.getOrCreateTag(tagName)
+		if err != nil {
+			fmt.Printf("Warning: failed to get or create tag '%s': %v\n", tagName, err)
+			continue
+		}
+		
+		// Create association if it doesn't exist
+		insertJunctionSQL := `
+		INSERT OR IGNORE INTO log_entries_tags (log_entry_id, tag_id)
+		VALUES (?, ?)`
+		
+		if _, err := a.db.Exec(insertJunctionSQL, entryID, tagID); err != nil {
+			fmt.Printf("Warning: failed to create tag association: %v\n", err)
+		}
+	}
+	
+	return nil
+}
+
+// getOrCreateTag returns the ID of a tag, creating it if necessary
+func (a *App) getOrCreateTag(tagName string) (int64, error) {
+	// Try to get existing tag
+	var tagID int64
+	query := `SELECT id FROM tags WHERE name = ?`
+	err := a.db.QueryRow(query, tagName).Scan(&tagID)
+	
+	if err == nil {
+		// Tag exists
+		return tagID, nil
+	}
+	
+	if err != sql.ErrNoRows {
+		// Error other than "not found"
+		return 0, fmt.Errorf("failed to query tag: %v", err)
+	}
+	
+	// Tag doesn't exist, create it
+	insertSQL := `INSERT INTO tags (name) VALUES (?)`
+	result, err := a.db.Exec(insertSQL, tagName)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create tag: %v", err)
+	}
+	
+	// Get the new tag's ID
+	tagID, err = result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get tag ID: %v", err)
+	}
+	
+	return tagID, nil
 }
 
 // ClearAllData deletes all log entries from the database
@@ -366,12 +483,20 @@ func (a *App) getDashboardData() (*DisplayDashboardData, error) {
 	// Calculate statistics
 	thisWeek := a.calculateThisWeekCount(entries)
 	
+	// Get all tags
+	tags, err := a.GetTags()
+	if err != nil {
+		fmt.Printf("Warning: failed to get tags: %v\n", err)
+		tags = []Tag{} // Use empty slice if tags fail
+	}
+	
 	return &DisplayDashboardData{
 		TotalEntries: totalCount,
 		TotalDays:    len(dayGroups),
 		ThisWeek:     thisWeek,
 		Generated:    time.Now().Local().Format("2006-01-02 15:04:05"),
 		DayGroups:    dayGroups,
+		Tags:         tags,
 	}, nil
 }
 
@@ -566,6 +691,95 @@ func (a *App) GetLogEntriesCount() (int, error) {
 	return count, nil
 }
 
+// Tag represents a tag in the database
+type Tag struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetTags returns all available tags
+func (a *App) GetTags() ([]Tag, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+
+	query := `SELECT id, name, created_at FROM tags ORDER BY name ASC`
+	rows, err := a.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tags: %v", err)
+	}
+	defer rows.Close()
+
+	var tags []Tag
+	for rows.Next() {
+		var tag Tag
+		err := rows.Scan(&tag.ID, &tag.Name, &tag.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan tag: %v", err)
+		}
+		tags = append(tags, tag)
+	}
+
+	return tags, nil
+}
+
+// GetEntriesByTags returns log entries filtered by tags
+func (a *App) GetEntriesByTags(tagNames []string, limit int) ([]LogEntry, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+
+	if len(tagNames) == 0 {
+		// No tags specified, return all entries
+		return a.GetLogEntries(limit)
+	}
+
+	// Build query to find entries that have ALL specified tags
+	// Using subquery to filter by tag intersection
+	placeholders := strings.Repeat("?,", len(tagNames))
+	placeholders = placeholders[:len(placeholders)-1] // Remove trailing comma
+	
+	query := fmt.Sprintf(`
+	SELECT DISTINCT e.id, e.content, e.created_at
+	FROM log_entries e
+	WHERE e.id IN (
+		SELECT let.log_entry_id
+		FROM log_entries_tags let
+		INNER JOIN tags t ON let.tag_id = t.id
+		WHERE t.name IN (%s)
+		GROUP BY let.log_entry_id
+		HAVING COUNT(DISTINCT t.name) = ?
+	)
+	ORDER BY e.created_at DESC
+	LIMIT ?`, placeholders)
+
+	// Build args: tag names, count of tags, and limit
+	args := make([]interface{}, 0, len(tagNames)+2)
+	for _, tagName := range tagNames {
+		args = append(args, tagName)
+	}
+	args = append(args, len(tagNames), limit)
+
+	rows, err := a.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query entries by tags: %v", err)
+	}
+	defer rows.Close()
+
+	var entries []LogEntry
+	for rows.Next() {
+		var entry LogEntry
+		err := rows.Scan(&entry.ID, &entry.Content, &entry.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan log entry: %v", err)
+		}
+		entries = append(entries, entry)
+	}
+
+	return entries, nil
+}
+
 // SearchLogEntries searches for log entries containing the given text
 func (a *App) SearchLogEntries(searchText string, limit int) ([]LogEntry, error) {
 	if a.db == nil {
@@ -623,6 +837,15 @@ func (a *App) GetDatabasePath() string {
 	}
 	snaplogDir := filepath.Join(configDir, "snaplog")
 	return filepath.Join(snaplogDir, "snaplog.db")
+}
+
+// GetDashboardPath returns the dashboard directory path
+func (a *App) GetDashboardPath() string {
+	tempPath, err := a.getTempPath()
+	if err != nil {
+		return "unknown"
+	}
+	return tempPath
 }
 
 // Quit closes the application
