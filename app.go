@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -18,8 +19,12 @@ import (
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.design/x/hotkey"
 	"github.com/yuin/goldmark"
+	"github.com/dsimmer/systray"
 	_ "modernc.org/sqlite"
 )
+
+//go:embed build/appicon.png
+var appIcon []byte
 
 // Settings represents the application configuration
 type Settings struct {
@@ -119,6 +124,9 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	
+	// Initialize systray
+	go a.initSystray()
+	
 	// Check if this is the first run
 	if a.settings.FirstRun {
 		fmt.Println("First run detected - showing setup window")
@@ -146,6 +154,9 @@ func (a *App) shutdown(ctx context.Context) {
 		a.db.Close()
 		fmt.Println("Database connection closed")
 	}
+	
+	// Quit systray
+	systray.Quit()
 }
 
 // initDatabase initializes the SQLite database
@@ -789,23 +800,15 @@ func (a *App) RenderMarkdown(markdown string) (string, error) {
 
 // ShowWindow brings the app window to the front
 func (a *App) ShowWindow() {
-	// On macOS, minimized windows can cause screen switching when unminimized.
-	// To prevent this, we center the window on the current screen before showing/unminimizing.
-	// This ensures it appears on the current screen rather than the screen where it was minimized.
-	if runtime.GOOS == "darwin" {
-		// Center on the current screen - this ensures the window appears on the current screen
-		// rather than switching to the screen where it was minimized
-		wailsRuntime.WindowCenter(a.ctx)
-	}
-	
 	wailsRuntime.WindowShow(a.ctx)
 	wailsRuntime.WindowUnminimise(a.ctx)
 }
 
 // HideWindow hides the app window
 func (a *App) HideWindow() {
-	// Use Minimize instead of Hide to keep taskbar icon visible
-	wailsRuntime.WindowMinimise(a.ctx)
+	// Use Hide instead of Minimize since systray handles the dock/menubar icon
+	// This prevents screen switching issues on macOS
+	wailsRuntime.WindowHide(a.ctx)
 }
 
 // GetDatabasePath returns the current database file path
@@ -831,6 +834,38 @@ func (a *App) GetDashboardPath() string {
 func (a *App) Quit() {
 	fmt.Println("Quitting SnapLog...")
 	wailsRuntime.Quit(a.ctx)
+}
+
+// initSystray initializes the system tray with menu items
+func (a *App) initSystray() {
+	systray.Run(func() {
+		// Set the app icon if available
+		if len(appIcon) > 0 {
+			systray.SetIcon(appIcon)
+		}
+		
+		// Set systray title and tooltip
+		systray.SetTitle("SnapLog")
+		systray.SetTooltip("SnapLog - Quick logging app")
+		
+		// Add "Show App" menu item
+		mShow := systray.AddMenuItem("Show App", "Show SnapLog window")
+		mShow.Click(func() {
+			a.ShowWindow()
+		})
+		
+		// Add separator
+		systray.AddSeparator()
+		
+		// Add "Quit App" menu item
+		mQuit := systray.AddMenuItem("Quit App", "Quit SnapLog")
+		mQuit.Click(func() {
+			a.Quit()
+		})
+	}, func() {
+		// onExit callback - cleanup if needed
+		fmt.Println("Systray exited")
+	})
 }
 
 // startHotkeyDetection registers a global hotkey using golang.design/x/hotkey

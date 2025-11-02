@@ -84,14 +84,16 @@ function App() {
             return;
         }
 
-        // Check for slash commands
-        if (text.trim().startsWith('/')) {
+        // Check for recognized slash commands
+        const trimmedText = text.trim();
+        const recognizedCommands = ['/dash', '/settings'];
+        
+        if (trimmedText.startsWith('/') && recognizedCommands.includes(trimmedText)) {
             try {
-                const command = text.trim();
-                await ProcessCommand(command);
+                await ProcessCommand(trimmedText);
                 setText(''); // Clear the input
                 // Don't hide window for settings command
-                if (command !== '/settings') {
+                if (trimmedText !== '/settings') {
                     setTimeout(() => {
                         HideWindow();
                     }, 100);
@@ -103,6 +105,7 @@ function App() {
             }
         }
 
+        // Log as regular text (even if it starts with / but isn't a recognized command)
         try {
             await LogText(text);
             setText(''); // Clear the input
