@@ -11,6 +11,17 @@
     "email": "pritish1998thombare@gmail.com"
   },
   "build": {
-    "cgo": false
+    "cgo": true,
+    "platforms": {
+      "darwin": {
+        "icon": "assets/icons/appicon.png"
+      },
+      "linux": {
+        "icon": "assets/icons/appicon.png"
+      },
+      "windows": {
+        "icon": "assets/icons/icon.ico"
+      }
+    }
   }
 }
