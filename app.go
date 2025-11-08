@@ -23,10 +23,10 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-//go:embed build/appicon.png
+//go:embed assets/icons/appicon.png
 var appIcon []byte
 
-//go:embed build/windows/icon.ico
+//go:embed assets/icons/icon.ico
 var appIconWindows []byte
 
 // Settings represents the application configuration
@@ -855,7 +855,7 @@ func (a *App) initSystray() {
 		}
 
 		// Optional tooltip on hover
-		systray.SetTooltip("SnapLog - Quick logging app")
+		systray.SetTooltip("SnapLog")
 
 		// Add "Show App" menu item
 		mShow := systray.AddMenuItem("Show App", "Show SnapLog window")
