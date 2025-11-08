@@ -177,7 +177,7 @@ function App() {
     const formatHotkey = (modifiers, key) => {
         const modStr = modifiers.map(m => {
             switch(m) {
-                case 'ctrl': return isMac ? 'Cmd' : 'Ctrl';
+                case 'ctrl': return 'Ctrl';
                 case 'cmd': return 'Cmd';
                 case 'alt': return isMac ? 'Option' : 'Alt';
                 case 'shift': return 'Shift';
@@ -189,7 +189,7 @@ function App() {
     
     const getModifierLabel = (modifier) => {
         switch(modifier) {
-            case 'ctrl': return isMac ? 'Cmd' : 'Ctrl';
+            case 'ctrl': return 'Ctrl';
             case 'cmd': return 'Cmd';
             case 'alt': return isMac ? 'Option' : 'Alt';
             case 'shift': return 'Shift';

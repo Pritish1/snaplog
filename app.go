@@ -26,6 +26,9 @@ import (
 //go:embed build/appicon.png
 var appIcon []byte
 
+//go:embed build/windows/icon.ico
+var appIconWindows []byte
+
 // Settings represents the application configuration
 type Settings struct {
 	HotkeyModifiers []string `json:"hotkey_modifiers"`
@@ -840,27 +843,43 @@ func (a *App) Quit() {
 func (a *App) initSystray() {
 	systray.Run(func() {
 		// Set the app icon if available
-		if len(appIcon) > 0 {
-			systray.SetIcon(appIcon)
+		switch runtime.GOOS {
+		case "windows":
+			if len(appIconWindows) > 0 {
+				systray.SetIcon(appIconWindows)
+			}
+		default:
+			if len(appIcon) > 0 {
+				systray.SetIcon(appIcon)
+			}
 		}
-		
-		// Set systray title and tooltip
-		systray.SetTitle("SnapLog")
+
+		// Optional tooltip on hover
 		systray.SetTooltip("SnapLog - Quick logging app")
-		
+
 		// Add "Show App" menu item
 		mShow := systray.AddMenuItem("Show App", "Show SnapLog window")
 		mShow.Click(func() {
 			a.ShowWindow()
 		})
-		
+
 		// Add separator
 		systray.AddSeparator()
-		
+
 		// Add "Quit App" menu item
 		mQuit := systray.AddMenuItem("Quit App", "Quit SnapLog")
 		mQuit.Click(func() {
 			a.Quit()
+		})
+
+		// Ensure the menu is shown on right-click (macOS requires this)
+		systray.SetOnRClick(func(menu systray.IMenu) {
+			menu.ShowMenu()
+		})
+
+		// Left click (or tap) brings the app window to front
+		systray.SetOnClick(func(menu systray.IMenu) {
+			a.ShowWindow()
 		})
 	}, func() {
 		// onExit callback - cleanup if needed
