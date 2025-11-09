@@ -6,6 +6,8 @@ export function CheckAccessibilityPermissions():Promise<boolean>;
 
 export function ClearAllData():Promise<void>;
 
+export function ClearDashboardFiles():Promise<string>;
+
 export function GetDashboardPath():Promise<string>;
 
 export function GetDatabasePath():Promise<string>;

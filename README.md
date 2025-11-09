@@ -45,11 +45,15 @@ The development build launches the React dev server and the Wails runtime with l
 ## Building Releases
 
 ```bash
-wails build            # builds for current platform
-wails build -platform darwin/amd64   # example: cross-build (requires macOS)
+# macOS (menu bar build)
+bash ./build-macos.sh
+# Other platforms
+wails build
+# example cross-build
+wails build -platform darwin/amd64
 ```
 
-Artifacts are written to `build/bin/`. When packaging, ensure the icons in `assets/icons/` are up to date—Wails consumes them during the build step.
+Artifacts are written to `build/bin/`. When packaging, ensure the icons in `assets/icons/` are up to date—`build-macos.sh` automatically runs `scripts/postbuild-macos.sh` to hide the Dock icon.
 
 ## Usage
 

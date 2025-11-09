@@ -375,6 +375,25 @@
     font-weight: 500;
 }
 
+.setting-note {
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.dashboard-feedback {
+    margin-top: 6px;
+    font-size: 0.6rem;
+}
+
+.dashboard-feedback.success {
+    color: #4ade80;
+}
+
+.dashboard-feedback.error {
+    color: #f87171;
+}
+
 /* Compact Hotkey Config */
 .hotkey-config-compact {
     display: flex;

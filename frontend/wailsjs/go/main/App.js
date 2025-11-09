@@ -10,6 +10,10 @@ export function ClearAllData() {
   return window['go']['main']['App']['ClearAllData']();
 }
 
+export function ClearDashboardFiles() {
+  return window['go']['main']['App']['ClearDashboardFiles']();
+}
+
 export function GetDashboardPath() {
   return window['go']['main']['App']['GetDashboardPath']();
 }

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SnapLog Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233498db'/%3E%3Cpath d='M42 21c0-5.5-4.3-9-10.7-9-4.4 0-8.6 1.4-11.6 4.1l3.6 5c2.1-1.8 4.6-2.8 7.1-2.8 2.6 0 4.3 1.3 4.3 3.1 0 1.8-1.1 2.9-5.4 4.2-5.6 1.7-9.4 4-9.4 9.4 0 5.5 4.6 9.3 11 9.3 4.4 0 7.8-1.5 10.5-3.9l-3.7-4.9c-2.1 1.7-4.3 2.6-6.5 2.6-2.4 0-4.1-1.1-4.1-3 0-1.7 1-2.7 5.1-3.9 6-1.8 9.8-4.2 9.8-9.2Z' fill='%23ffffff'/%3E%3C/svg%3E" />
     <style>
         * {
             margin: 0;
@@ -25,24 +26,81 @@
         }
         
         .header {
-            background: white;
-            border-radius: 8px;
-            padding: 24px;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 20px 24px;
             margin-bottom: 24px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            border-left: 4px solid #3498db;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
         }
         
-        .header h1 {
-            font-size: 1.8rem;
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            object-fit: cover;
+            border: 1px solid #d1d5db;
+            background: #fff;
+        }
+
+        .header-logo.fallback {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-weight: 600;
-            color: #2c3e50;
-            margin-bottom: 8px;
+            font-size: 1.1rem;
+            letter-spacing: -0.02em;
+            border: none;
+            background: linear-gradient(135deg, #3498db, #1d4ed8);
+            color: #ffffff;
         }
         
-        .header p {
-            color: #7f8c8d;
+        .header-text {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .header-title {
+            font-size: 1.35rem;
+            font-weight: 600;
+            color: #1f2933;
+            letter-spacing: -0.01em;
+        }
+        
+        .header-subtitle {
+            color: #5f6c7b;
             font-size: 0.95rem;
+        }
+        
+        .header-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+            color: #6b7280;
+            font-size: 0.85rem;
+        }
+        
+        .header-meta-label {
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+        
+        .header-meta-value {
+            font-weight: 500;
+            color: #1f2933;
         }
         
         .controls {
@@ -118,6 +176,7 @@
             display: flex;
             gap: 8px;
             align-items: center;
+            flex-wrap: wrap;
         }
         
         .quick-filter-btn {
@@ -144,45 +203,34 @@
         
         .stats {
             display: flex;
-            justify-content: space-around;
-            padding: 8px 20px;
-            background-color: #f8f9fa;
-            border-bottom: 1px solid #e9ecef;
+            gap: 16px;
             flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 16px;
+            margin-bottom: 24px;
+            padding: 0 4px;
         }
         
         .stat-card {
-            background-color: #ffffff;
-            padding: 6px 12px;
-            border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-            text-align: center;
-            min-width: 80px;
-            flex: 1;
-            margin: 2px;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            background: transparent;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            color: #475569;
         }
         
         .stat-number {
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 600;
-            color: #495057;
-            margin-bottom: 2px;
+            color: #1f2933;
         }
         
         .stat-label {
-            color: #6c757d;
+            color: #94a3b8;
             font-size: 0.75rem;
-            font-weight: 500;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
+            letter-spacing: 0.06em;
         }
         
         .content {
@@ -468,10 +516,13 @@
             
             .header {
                 padding: 16px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
             }
             
-            .header h1 {
-                font-size: 1.5rem;
+            .header-meta {
+                align-items: flex-start;
             }
             
             .controls {
@@ -485,7 +536,9 @@
             }
             
             .stats {
-                grid-template-columns: 1fr;
+                flex-direction: column;
+                gap: 8px;
+                padding: 0;
             }
             
             .day-header {
@@ -651,13 +704,40 @@
                 transform: scale(1);
             }
         }
+
+        .error-banner {
+            background: #fff5f5;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .error-banner.show {
+            display: block;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>SnapLog Dashboard</h1>
-            <p>Your personal knowledge repository</p>
+            <div class="header-left">
+                {{if .LogoData}}
+                <img src="{{.LogoData}}" alt="SnapLog" class="header-logo" />
+                {{else}}
+                <div class="header-logo fallback">S</div>
+                {{end}}
+                <div class="header-text">
+                    <div class="header-title">SnapLog Dashboard</div>
+                    <div class="header-subtitle">Contextual view of your recent captured thoughts</div>
+                </div>
+            </div>
+            <div class="header-meta">
+                <span class="header-meta-label">Generated</span>
+                <span class="header-meta-value">{{.Generated}}</span>
+            </div>
         </div>
         
         <div class="controls">
@@ -670,11 +750,14 @@
                 <button class="clear-btn" onclick="clearFilter()">Clear</button>
             </div>
             <div class="quick-filters">
-                <button class="quick-filter-btn" onclick="setQuickFilter('today')">Today</button>
-                <button class="quick-filter-btn" onclick="setQuickFilter('week')">This Week</button>
-                <button class="quick-filter-btn" onclick="setQuickFilter('month')">This Month</button>
+                <button class="quick-filter-btn" onclick="setQuickFilter('today', event)">Today</button>
+                <button class="quick-filter-btn" onclick="setQuickFilter('week', event)">This Week</button>
+                <button class="quick-filter-btn" onclick="setQuickFilter('pastWeek', event)">Past Week</button>
+                <button class="quick-filter-btn" onclick="setQuickFilter('month', event)">This Month</button>
             </div>
         </div>
+
+        <div id="date-error" class="error-banner"></div>
         
         <div class="tag-filter-section" id="tag-filter-section" style="display: none;">
             <div class="tag-filter-header">Filter by Tags</div>
@@ -758,42 +841,41 @@
     </div>
     
     <div class="copy-feedback" id="copy-feedback">Copied to clipboard!</div>
+
+    <script id="snaplog-data" type="application/json">{{if .OriginalJSONRaw}}{{.OriginalJSONRaw}}{{else}}{"totalEntries":0,"totalDays":0,"thisWeek":0,"dayGroups":[],"tags":[]}{{end}}</script>
     
     <script>
         // Store original data for filtering
-        const originalData = {
-            totalEntries: {{.TotalEntries}},
-            totalDays: {{.TotalDays}},
-            thisWeek: {{.ThisWeek}},
-            dayGroups: [
-                {{range .DayGroups}}
-                {
-                    dayName: "{{.DayName}}",
-                    date: "{{.Date}}",
-                    count: {{.Count}},
-                    entries: [
-                        {{range .Entries}}
-                        {
-                            id: {{.ID}},
-                            content: `{{.RenderedHTML}}`,
-                            localTime: "{{.LocalTime}}",
-                            date: "{{.DateString}}"
-                        },
-                        {{end}}
-                    ]
-                },
-                {{end}}
-            ],
-            tags: [
-                {{range .Tags}}
-                { id: {{.ID}}, name: "{{.Name}}" },
-                {{end}}
-            ]
-        };
+        let originalData = { totalEntries: 0, totalDays: 0, thisWeek: 0, dayGroups: [], tags: [] };
+        const dataElement = document.getElementById('snaplog-data');
+        if (dataElement) {
+            try {
+                const parsed = JSON.parse(dataElement.textContent || '{}');
+                if (parsed && typeof parsed === 'object') {
+                    originalData = parsed;
+                }
+            } catch (err) {
+                console.warn('Unable to parse dashboard data', err);
+            }
+        }
         
         // Selected tags for filtering
         let selectedTags = [];
         
+        function showDateError(message) {
+            const banner = document.getElementById('date-error');
+            if (!banner) return;
+            banner.textContent = message;
+            banner.classList.add('show');
+        }
+
+        function hideDateError() {
+            const banner = document.getElementById('date-error');
+            if (!banner) return;
+            banner.textContent = '';
+            banner.classList.remove('show');
+        }
+
         function filterByDate() {
             const startDate = document.getElementById('start-date').value;
             const endDate = document.getElementById('end-date').value;
@@ -801,6 +883,8 @@
             console.log('Filtering by date range:', startDate, 'to', endDate);
             console.log('Available entries:', originalData.dayGroups.map(dg => ({ date: dg.date, count: dg.count })));
             
+            hideDateError();
+
             if (!startDate && !endDate && selectedTags.length === 0) {
                 clearFilter();
                 return;
@@ -808,6 +892,11 @@
             
             const start = startDate ? new Date(startDate) : new Date('1900-01-01');
             const end = endDate ? new Date(endDate) : new Date('2100-12-31');
+
+            if (startDate && endDate && start > end) {
+                showDateError('Start date must be earlier than the end date.');
+                return;
+            }
             
             console.log('Parsed dates:', start, 'to', end);
             
@@ -815,37 +904,42 @@
             let filteredDays = 0;
             
             // Filter day groups by date
-            const dateFilteredDayGroups = originalData.dayGroups.filter(dayGroup => {
+            const dateFilteredDayGroups = [];
+            originalData.dayGroups.forEach(dayGroup => {
                 const dayDate = new Date(dayGroup.date);
                 console.log('Checking day:', dayGroup.date, 'against range:', start, 'to', end);
-                if (dayDate >= start && dayDate <= end) {
-                    // Filter entries within this day
-                    const filteredEntries = dayGroup.entries.filter(entry => {
-                        const entryDate = new Date(entry.date);
-                        return entryDate >= start && entryDate <= end;
-                    });
-                    
-                    if (filteredEntries.length > 0) {
-                        dayGroup.entries = filteredEntries;
-                        dayGroup.count = filteredEntries.length;
-                        return true;
-                    }
+                if (dayDate < start || dayDate > end) {
+                    return;
                 }
-                return false;
+
+                const filteredEntries = dayGroup.entries.filter(entry => {
+                    const entryDate = new Date(entry.date);
+                    return entryDate >= start && entryDate <= end;
+                });
+
+                if (filteredEntries.length > 0) {
+                    dateFilteredDayGroups.push({
+                        dayName: dayGroup.dayName,
+                        date: dayGroup.date,
+                        count: filteredEntries.length,
+                        entries: filteredEntries
+                    });
+                }
             });
-            
+             
             // Apply tag filter if tags are selected
             const filteredDayGroups = dateFilteredDayGroups.map(dayGroup => {
                 if (selectedTags.length === 0) {
                     return dayGroup;
                 }
-                
+
                 const tagFilteredEntries = dayGroup.entries.filter(entry => {
                     return selectedTags.every(tag => entry.content.includes(`#${tag}`));
                 });
-                
+
                 return {
-                    ...dayGroup,
+                    dayName: dayGroup.dayName,
+                    date: dayGroup.date,
                     entries: tagFilteredEntries,
                     count: tagFilteredEntries.length
                 };
@@ -870,7 +964,7 @@
             filterInfo.style.display = 'block';
         }
         
-        function setQuickFilter(type) {
+        function setQuickFilter(type, evt) {
             const today = new Date();
             const startDateInput = document.getElementById('start-date');
             const endDateInput = document.getElementById('end-date');
@@ -881,7 +975,11 @@
             });
             
             // Add active class to clicked button
-            event.target.classList.add('active');
+            if (evt && evt.target) {
+                evt.target.classList.add('active');
+            }
+
+            hideDateError();
             
             switch(type) {
                 case 'today':
@@ -898,6 +996,15 @@
                     startDateInput.value = weekStart.toISOString().split('T')[0];
                     endDateInput.value = weekEnd.toISOString().split('T')[0];
                     console.log('Week filter set to:', weekStart.toISOString().split('T')[0], 'to', weekEnd.toISOString().split('T')[0]);
+                    break;
+                case 'pastWeek':
+                    const pastWeekEnd = new Date(today);
+                    pastWeekEnd.setDate(today.getDate() - 1);
+                    const pastWeekStart = new Date(pastWeekEnd);
+                    pastWeekStart.setDate(pastWeekEnd.getDate() - 6);
+                    startDateInput.value = pastWeekStart.toISOString().split('T')[0];
+                    endDateInput.value = pastWeekEnd.toISOString().split('T')[0];
+                    console.log('Past week filter set to:', pastWeekStart.toISOString().split('T')[0], 'to', pastWeekEnd.toISOString().split('T')[0]);
                     break;
                 case 'month':
                     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -928,6 +1035,7 @@
             
             // Hide filter info
             document.getElementById('filter-info').style.display = 'none';
+            hideDateError();
             
             // Restore original display
             updateDisplay(originalData.dayGroups, originalData.totalEntries, originalData.totalDays);
@@ -979,9 +1087,10 @@
                         return entry.content.includes(`#${tag}`);
                     });
                 });
-                
+
                 return {
-                    ...dayGroup,
+                    dayName: dayGroup.dayName,
+                    date: dayGroup.date,
                     entries: filteredEntries,
                     count: filteredEntries.length
                 };

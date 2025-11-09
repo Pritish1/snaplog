@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -87,6 +88,8 @@ type DisplayDashboardData struct {
 	Generated    string           `json:"generated"`
 	DayGroups    []DisplayDayGroup `json:"day_groups"`
 	Tags         []Tag             `json:"tags"`
+	LogoData     template.URL     `json:"logo_data"`
+	OriginalJSONRaw template.JS   `json:"original_json_raw"`
 }
 
 
@@ -470,14 +473,62 @@ func (a *App) getDashboardData() (*DisplayDashboardData, error) {
 		tags = []Tag{} // Use empty slice if tags fail
 	}
 	
-	return &DisplayDashboardData{
-		TotalEntries: totalCount,
-		TotalDays:    len(dayGroups),
-		ThisWeek:     thisWeek,
-		Generated:    time.Now().Local().Format("2006-01-02 15:04:05"),
-		DayGroups:    dayGroups,
-		Tags:         tags,
-	}, nil
+	var logoData template.URL
+	if len(appIcon) > 0 {
+		logoData = template.URL("data:image/png;base64," + base64.StdEncoding.EncodeToString(appIcon))
+	}
+
+    dayGroupsJSON := make([]map[string]interface{}, len(dayGroups))
+    for i, dg := range dayGroups {
+        entriesJSON := make([]map[string]interface{}, len(dg.Entries))
+        for j, entry := range dg.Entries {
+            entriesJSON[j] = map[string]interface{}{
+                "id":        entry.ID,
+                "content":   entry.RenderedHTML,
+                "localTime": entry.LocalTime,
+                "date":      entry.DateString,
+            }
+        }
+
+        dayGroupsJSON[i] = map[string]interface{}{
+            "dayName": dg.DayName,
+            "date":    dg.Date,
+            "count":   dg.Count,
+            "entries": entriesJSON,
+        }
+    }
+
+    tagsJSON := make([]map[string]interface{}, len(tags))
+    for i, tag := range tags {
+        tagsJSON[i] = map[string]interface{}{
+            "id":   tag.ID,
+            "name": tag.Name,
+        }
+    }
+
+    jsonSource := map[string]interface{}{
+        "totalEntries": totalCount,
+        "totalDays":    len(dayGroups),
+        "thisWeek":     thisWeek,
+        "dayGroups":    dayGroupsJSON,
+        "tags":         tagsJSON,
+    }
+
+    jsonBytes, err := json.Marshal(jsonSource)
+    if err != nil {
+        return nil, fmt.Errorf("failed to encode dashboard json: %w", err)
+    }
+
+    return &DisplayDashboardData{
+        TotalEntries: totalCount,
+        TotalDays:    len(dayGroups),
+        ThisWeek:     thisWeek,
+        Generated:    time.Now().Local().Format("2006-01-02 15:04:05"),
+        DayGroups:    dayGroups,
+        Tags:         tags,
+        LogoData:     logoData,
+        OriginalJSONRaw: template.JS(string(jsonBytes)),
+    }, nil
 }
 
 // groupDisplayEntriesByDay groups display entries by day using local time
@@ -831,6 +882,38 @@ func (a *App) GetDashboardPath() string {
 		return "unknown"
 	}
 	return tempPath
+}
+
+// ClearDashboardFiles removes generated dashboard HTML files from the temp directory
+func (a *App) ClearDashboardFiles() (string, error) {
+    tempPath, err := a.getTempPath()
+    if err != nil {
+        return "", fmt.Errorf("unable to locate dashboard directory: %w", err)
+    }
+
+    entries, err := os.ReadDir(tempPath)
+    if err != nil {
+        return "", fmt.Errorf("unable to inspect dashboard directory: %w", err)
+    }
+
+    pattern := regexp.MustCompile(`^snaplog-dashboard.*\.html$`)
+    removed := 0
+
+    for _, entry := range entries {
+        if entry.Type().IsRegular() && pattern.MatchString(entry.Name()) {
+            if err := os.Remove(filepath.Join(tempPath, entry.Name())); err != nil {
+                return "", fmt.Errorf("failed to remove %s: %w", entry.Name(), err)
+            }
+            removed++
+        }
+    }
+
+    message := "No dashboard files found to remove"
+    if removed > 0 {
+        message = fmt.Sprintf("Removed %d dashboard file(s)", removed)
+    }
+
+    return message, nil
 }
 
 // Quit closes the application

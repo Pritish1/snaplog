@@ -1,6 +1,6 @@
 import {useState, useEffect} from 'react';
 import './App.css';
-import {LogText, HideWindow, Quit, GetSettings, SetSettings, RenderMarkdown, ProcessCommand, ClearAllData, GetDatabasePath, GetDashboardPath} from "../wailsjs/go/main/App";
+import {LogText, HideWindow, Quit, GetSettings, SetSettings, RenderMarkdown, ProcessCommand, ClearAllData, GetDatabasePath, GetDashboardPath, ClearDashboardFiles} from "../wailsjs/go/main/App";
 import {EventsOn} from "../wailsjs/runtime/runtime";
 
 function App() {
@@ -13,6 +13,8 @@ function App() {
     const [deleteSuccess, setDeleteSuccess] = useState(false);
     const [databasePath, setDatabasePath] = useState('');
     const [dashboardPath, setDashboardPath] = useState('');
+    const [dashboardCleanupMessage, setDashboardCleanupMessage] = useState('');
+    const [dashboardCleanupStatus, setDashboardCleanupStatus] = useState('success');
     
     // Detect macOS
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0 || navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
@@ -212,6 +214,22 @@ function App() {
         }
     };
 
+    const handleClearDashboards = async () => {
+        try {
+            const response = await ClearDashboardFiles();
+            setDashboardCleanupStatus('success');
+            setDashboardCleanupMessage(response || 'Dashboard files cleared.');
+        } catch (error) {
+            console.error('Error clearing dashboard files:', error);
+            setDashboardCleanupStatus('error');
+            setDashboardCleanupMessage('Unable to clear dashboard files.');
+        }
+
+        setTimeout(() => {
+            setDashboardCleanupMessage('');
+        }, 4000);
+    };
+
     return (
         <div id="App" className={settings.theme === 'light' ? 'theme-light' : 'theme-dark'}>
             <div className="header">
@@ -342,6 +360,16 @@ function App() {
                                         Light
                                     </label>
                                 </div>
+                            </div>
+
+                            {/* Dashboard Maintenance */}
+                            <div className="setting-group">
+                                <label>Dashboards</label>
+                                <p className="setting-note">Remove generated dashboard HTML files from the temporary directory. New dashboards will regenerate automatically.</p>
+                                <button className="clear-btn" onClick={handleClearDashboards}>Clear Generated Dashboards</button>
+                                {dashboardCleanupMessage && (
+                                    <p className={`dashboard-feedback ${dashboardCleanupStatus}`}>{dashboardCleanupMessage}</p>
+                                )}
                             </div>
 
                             {/* Delete All Data */}
