@@ -1,70 +1,63 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+# Post-build script to add LSUIElement to Info.plist (hides app from Dock)
+#
+# This script modifies the built macOS app to hide it from the Dock.
+# Note: Modifying Info.plist invalidates code signing. For development this is fine.
+# For distribution, you may need to re-sign the app.
 
-APP_NAME="snaplog"
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}" )/.." && pwd)"
-BIN_DIR="$PROJECT_ROOT/build/bin"
 
-if [[ ! -d "$BIN_DIR" ]]; then
-  echo "Error: build/bin directory not found. Run 'wails build' first." >&2
-  exit 1
+APP_BUNDLE="build/bin/snaplog.app"
+INFO_PLIST="${APP_BUNDLE}/Contents/Info.plist"
+
+
+if [ ! -f "$INFO_PLIST" ]; then
+   echo "Error: Info.plist not found at $INFO_PLIST"
+   echo "Make sure you've run 'wails build' first"
+   exit 1
 fi
 
-APP_PATH="$(find "$BIN_DIR" -maxdepth 3 -type d -name "${APP_NAME}.app" | head -n 1)"
 
-if [[ -z "$APP_PATH" ]]; then
-  echo "Error: Could not locate ${APP_NAME}.app inside build/bin." >&2
-  exit 1
+# Check if LSUIElement already exists
+if grep -q "LSUIElement" "$INFO_PLIST"; then
+   echo "LSUIElement already exists in Info.plist"
+   exit 0
 fi
 
-PLIST="$APP_PATH/Contents/Info.plist"
 
-if [[ ! -f "$PLIST" ]]; then
-  echo "Error: Info.plist not found at $PLIST" >&2
-  exit 1
+# Use plutil (macOS's native plist tool) if available - more reliable
+if command -v plutil &> /dev/null; then
+   # Convert to binary plist, add key, convert back
+   plutil -convert binary1 "$INFO_PLIST" 2>/dev/null
+   plutil -insert LSUIElement -bool true "$INFO_PLIST" 2>/dev/null
+   plutil -convert xml1 "$INFO_PLIST" 2>/dev/null
+  
+   if grep -q "LSUIElement" "$INFO_PLIST"; then
+       echo "✓ Added LSUIElement using plutil (app will be hidden from Dock)"
+       exit 0
+   fi
 fi
 
-if /usr/bin/plutil -replace LSUIElement -bool true "$PLIST"; then
-  echo "Set LSUIElement=true using plutil"
+
+# Fallback: Use awk if plutil didn't work
+echo "Using fallback method (awk)..."
+TEMP_FILE=$(mktemp)
+
+
+# Use awk to insert LSUIElement before NSHumanReadableCopyright or before closing </dict>
+if grep -q "NSHumanReadableCopyright" "$INFO_PLIST"; then
+   awk '/<key>NSHumanReadableCopyright<\/key>/ {print "        <key>LSUIElement</key>"; print "        <true/>"} {print}' "$INFO_PLIST" > "$TEMP_FILE"
 else
-  echo "plutil failed, applying awk fallback" >&2
-  TMP_FILE="${PLIST}.tmp"
-  awk '
-    { lines[++n] = $0 }
-    END {
-      found = 0
-      for (i = 1; i <= n; i++) {
-        line = lines[i]
-        if (!found && line ~ /<key>LSUIElement<\/key>/) {
-          found = 1
-          print line
-          if (i + 1 <= n && lines[i + 1] ~ /<true\/>|<false\/>/) {
-            print "    <true/>"
-            i++
-          } else {
-            print "    <true/>"
-          }
-          for (j = i + 1; j <= n; j++) {
-            print lines[j]
-          }
-          exit
-        }
-      }
-      inserted = 0
-      for (i = 1; i <= n; i++) {
-        line = lines[i]
-        if (!inserted && line ~ /<\/dict>/) {
-          print "    <key>LSUIElement</key>"
-          print "    <true/>"
-          inserted = 1
-        }
-        print line
-      }
-      if (!inserted) {
-        print "    <key>LSUIElement</key>"
-        print "    <true/>"
-      }
-    }
-  ' "$PLIST" > "$TMP_FILE"
-  mv "$TMP_FILE" "$PLIST"
+   awk '/<\/dict>/ {print "        <key>LSUIElement</key>"; print "        <true/>"} {print}' "$INFO_PLIST" > "$TEMP_FILE"
+fi
+
+
+# Replace the original file
+mv "$TEMP_FILE" "$INFO_PLIST"
+
+
+if grep -q "LSUIElement" "$INFO_PLIST"; then
+   echo "✓ Added LSUIElement to Info.plist (app will be hidden from Dock)"
+else
+   echo "✗ Failed to add LSUIElement"
+   exit 1
 fi

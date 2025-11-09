@@ -11,7 +11,7 @@
     "email": "pritish1998thombare@gmail.com"
   },
   "build": {
-    "cgo": true,
+    "cgo": false,
     "platforms": {
       "darwin": {
         "icon": "assets/icons/appicon.png"
