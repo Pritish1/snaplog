@@ -14,6 +14,10 @@ export function ClearDashboardFiles() {
   return window['go']['main']['App']['ClearDashboardFiles']();
 }
 
+export function DeleteEntry(arg1) {
+  return window['go']['main']['App']['DeleteEntry'](arg1);
+}
+
 export function GetDashboardPath() {
   return window['go']['main']['App']['GetDashboardPath']();
 }
@@ -24,6 +28,18 @@ export function GetDatabasePath() {
 
 export function GetEntriesByTags(arg1, arg2) {
   return window['go']['main']['App']['GetEntriesByTags'](arg1, arg2);
+}
+
+export function GetEntryByID(arg1) {
+  return window['go']['main']['App']['GetEntryByID'](arg1);
+}
+
+export function GetEntryForEdit(arg1) {
+  return window['go']['main']['App']['GetEntryForEdit'](arg1);
+}
+
+export function GetEntryPreview(arg1) {
+  return window['go']['main']['App']['GetEntryPreview'](arg1);
 }
 
 export function GetLogEntries(arg1) {
@@ -88,4 +104,8 @@ export function ShowInstructions() {
 
 export function ShowWindow() {
   return window['go']['main']['App']['ShowWindow']();
+}
+
+export function UpdateEntry(arg1, arg2) {
+  return window['go']['main']['App']['UpdateEntry'](arg1, arg2);
 }

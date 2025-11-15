@@ -8,11 +8,19 @@ export function ClearAllData():Promise<void>;
 
 export function ClearDashboardFiles():Promise<string>;
 
+export function DeleteEntry(arg1:number):Promise<void>;
+
 export function GetDashboardPath():Promise<string>;
 
 export function GetDatabasePath():Promise<string>;
 
 export function GetEntriesByTags(arg1:Array<string>,arg2:number):Promise<Array<main.LogEntry>>;
+
+export function GetEntryByID(arg1:number):Promise<main.LogEntry>;
+
+export function GetEntryForEdit(arg1:number):Promise<string>;
+
+export function GetEntryPreview(arg1:number):Promise<string>;
 
 export function GetLogEntries(arg1:number):Promise<Array<main.LogEntry>>;
 
@@ -45,3 +53,5 @@ export function SetSettings(arg1:main.Settings):Promise<void>;
 export function ShowInstructions():Promise<void>;
 
 export function ShowWindow():Promise<void>;
+
+export function UpdateEntry(arg1:number,arg2:string):Promise<void>;

@@ -260,6 +260,32 @@
             justify-content: space-between;
             cursor: pointer;
             transition: background-color 0.2s;
+            position: relative;
+        }
+        
+        .day-header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            z-index: 1;
+        }
+        
+        .copy-day-btn {
+            background: none;
+            color: #7f8c8d;
+            border: none;
+            padding: 4px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            opacity: 0.6;
+        }
+        
+        .copy-day-btn:hover {
+            background: #ecf0f1;
+            color: #2c3e50;
+            opacity: 1;
         }
         
         .day-header:hover {
@@ -372,6 +398,9 @@
             color: #2c3e50;
             font-size: 0.95rem;
             line-height: 1.6;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            overflow-x: hidden;
         }
         
         .entry-actions {
@@ -405,6 +434,30 @@
         
         .copy-btn.copied {
             color: #27ae60;
+            opacity: 1;
+        }
+        
+        .edit-btn, .delete-btn {
+            background: none;
+            color: #7f8c8d;
+            border: none;
+            padding: 4px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            opacity: 0.6;
+        }
+        
+        .edit-btn:hover {
+            background: #ecf0f1;
+            color: #3498db;
+            opacity: 1;
+        }
+        
+        .delete-btn:hover {
+            background: #ecf0f1;
+            color: #e74c3c;
             opacity: 1;
         }
         
@@ -505,6 +558,61 @@
         .footer a {
             color: #3498db;
             text-decoration: none;
+        }
+        
+        /* Print styles */
+        @media print {
+            .filter-controls,
+            .controls,
+            .header,
+            .footer,
+            .entry-actions,
+            .copy-day-btn,
+            .day-header-actions,
+            .export-markdown-btn,
+            .edit-btn,
+            .delete-btn {
+                display: none !important;
+            }
+            
+            .entry {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            
+            .day-group {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            
+            .day-content {
+                max-height: none !important;
+                opacity: 1 !important;
+            }
+            
+            .content {
+                box-shadow: none;
+            }
+            
+            body {
+                background: white;
+            }
+        }
+        
+        .export-markdown-btn {
+            background: none;
+            color: #3498db;
+            border: none;
+            padding: 0;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            font-family: inherit;
+        }
+        
+        .export-markdown-btn:hover {
+            text-decoration: underline;
         }
         
         .footer a:hover {
@@ -809,7 +917,10 @@
                                 <div class="day-name">{{.DayName}}</div>
                                 <div class="day-date" data-iso-date="{{.Date}}">{{.Date}}</div>
                             </div>
-                            <div class="day-count">{{.Count}} entries</div>
+                            <div class="day-header-actions" onclick="event.stopPropagation();">
+                                <div class="day-count">{{.Count}} entries</div>
+                                <button class="copy-day-btn" onclick="copyDayToClipboard('{{.Date}}', event)" title="Copy all entries for this day">📋</button>
+                            </div>
                         </div>
                         
                         <div class="day-content" id="content-{{.Date}}">
@@ -822,6 +933,8 @@
                                     </div>
                                     <div class="entry-actions">
                                         <button class="copy-btn" onclick="copyToClipboard('{{.ID}}')" title="Copy text">📋</button>
+                                        <button class="edit-btn" onclick="copyEditCommand('{{.ID}}')" title="Copy edit command">✏️</button>
+                                        <button class="delete-btn" onclick="copyDeleteCommand('{{.ID}}')" title="Copy delete command">🗑️</button>
                                     </div>
                                 </div>
                                 {{end}}
@@ -832,14 +945,14 @@
                 {{else}}
                     <div class="no-entries">
                         <div class="no-entries-icon">📝</div>
-                        <p>No entries found. Start logging your thoughts!</p>
+                        <p>No entries yet, press the hotkey to log your first entry!</p>
                     </div>
                 {{end}}
             </div>
         </div>
         
         <div class="footer">
-            <p>Generated on {{.Generated}} | <a href="#" onclick="window.location.reload()">Refresh</a> | SnapLog Dashboard</p>
+            <p>Generated on {{.Generated}} | <a href="#" onclick="window.location.reload()">Refresh</a> | <button class="export-markdown-btn" onclick="exportAsMarkdown()">Export as Markdown</button> | SnapLog Dashboard</p>
         </div>
     </div>
     
@@ -1141,7 +1254,10 @@
                                 <div class="day-name">${dayGroup.dayName}</div>
                                 <div class="day-date">${dayGroup.date}</div>
                             </div>
-                            <div class="day-count">${dayGroup.count} entries</div>
+                            <div class="day-header-actions" onclick="event.stopPropagation();">
+                                <div class="day-count">${dayGroup.count} entries</div>
+                                <button class="copy-day-btn" onclick="copyDayToClipboard('${dayGroup.date}', event)" title="Copy all entries for this day">📋</button>
+                            </div>
                         </div>
                         <div class="day-content" id="content-${dayGroup.date}">
                             <div class="entries-container">
@@ -1156,6 +1272,8 @@
                             </div>
                             <div class="entry-actions">
                                 <button class="copy-btn" onclick="copyToClipboard('${entry.id}')" title="Copy text">📋</button>
+                                <button class="edit-btn" onclick="copyEditCommand('${entry.id}')" title="Copy edit command">✏️</button>
+                                <button class="delete-btn" onclick="copyDeleteCommand('${entry.id}')" title="Copy delete command">🗑️</button>
                             </div>
                         </div>
                     `;
@@ -1245,6 +1363,144 @@
             setTimeout(() => {
                 feedback.classList.remove('show');
             }, 2000);
+        }
+        
+        function copyEditCommand(entryId) {
+            const command = `/edit ${entryId}`;
+            navigator.clipboard.writeText(command).then(() => {
+                showCopyFeedback();
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = command;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showCopyFeedback();
+            });
+        }
+        
+        function copyDeleteCommand(entryId) {
+            const command = `/delete ${entryId}`;
+            navigator.clipboard.writeText(command).then(() => {
+                showCopyFeedback();
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = command;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showCopyFeedback();
+            });
+        }
+        
+        function copyDayToClipboard(dateKey, event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            
+            // Find all entries for this day
+            const dayGroup = document.querySelector(`.day-group[data-date="${dateKey}"]`);
+            if (!dayGroup) {
+                console.error('Day group not found:', dateKey);
+                return;
+            }
+            
+            const entries = dayGroup.querySelectorAll('.entry');
+            if (entries.length === 0) {
+                console.error('No entries found for day:', dateKey);
+                return;
+            }
+            
+            // Collect all entry texts with timestamps
+            let dayText = '';
+            entries.forEach(entry => {
+                const timeElement = entry.querySelector('.entry-time');
+                const contentElement = entry.querySelector('.entry-content');
+                if (timeElement && contentElement) {
+                    const time = timeElement.textContent.trim();
+                    const content = contentElement.textContent || contentElement.innerText;
+                    dayText += `[${time}] ${content}\n\n`;
+                }
+            });
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(dayText.trim()).then(() => {
+                showCopyFeedback();
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = dayText.trim();
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showCopyFeedback();
+            });
+        }
+        
+        function exportAsMarkdown() {
+            // Get currently displayed entries
+            const container = document.getElementById('entries-container');
+            const dayGroups = container.querySelectorAll('.day-group');
+            
+            if (dayGroups.length === 0) {
+                alert('No entries to export');
+                return;
+            }
+            
+            let markdown = '# SnapLog Export\n\n';
+            markdown += `Generated: ${new Date().toLocaleString()}\n\n`;
+            markdown += '---\n\n';
+            
+            dayGroups.forEach(dayGroup => {
+                const date = dayGroup.getAttribute('data-date');
+                const dayName = dayGroup.querySelector('.day-name')?.textContent || date;
+                const entries = dayGroup.querySelectorAll('.entry');
+                
+                markdown += `## ${dayName} (${date})\n\n`;
+                
+                entries.forEach(entry => {
+                    const timeElement = entry.querySelector('.entry-time');
+                    const contentElement = entry.querySelector('.entry-content');
+                    if (timeElement && contentElement) {
+                        const time = timeElement.textContent.trim();
+                        // Get the raw markdown content from the data
+                        const entryId = entry.getAttribute('data-id');
+                        // Find the original entry data to get raw markdown
+                        let rawContent = '';
+                        for (let dg of originalData.dayGroups) {
+                            const foundEntry = dg.entries.find(e => e.id.toString() === entryId);
+                            if (foundEntry) {
+                                rawContent = foundEntry.rawContent || foundEntry.content;
+                                break;
+                            }
+                        }
+                        // Fallback to text content if raw not found
+                        if (!rawContent) {
+                            rawContent = contentElement.textContent || contentElement.innerText;
+                        }
+                        markdown += `### ${time}\n\n${rawContent}\n\n---\n\n`;
+                    }
+                });
+            });
+            
+            // Create a blob and download
+            const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `snaplog-export-${new Date().toISOString().split('T')[0]}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
         
         function formatDateForDisplay(isoDate) {

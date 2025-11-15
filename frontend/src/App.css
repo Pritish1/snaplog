@@ -67,6 +67,7 @@
     flex-direction: column;
     min-height: 0;
     transition: background-color 0.3s ease;
+    overflow: hidden;
 }
 
 .input-container:focus-within {
@@ -185,6 +186,11 @@
     transition: all 0.2s;
     min-height: 0;
     line-height: 1.4;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    overflow-x: hidden;
+    overflow-y: auto;
+    box-sizing: border-box;
 }
 
 .text-input:focus {
@@ -207,6 +213,11 @@
     line-height: 1.4;
     color: var(--text-color);
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    outline: none;
+}
+
+.markdown-preview:focus {
+    outline: none;
 }
 
 .markdown-preview h1 {
@@ -1074,11 +1085,100 @@
     }
 }
 
+/* Delete confirmation dialog */
+.delete-confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.delete-confirm-dialog {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 20px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.delete-confirm-dialog h3 {
+    margin: 0 0 12px 0;
+    color: var(--text-color);
+    font-size: 1rem;
+}
+
+.delete-preview {
+    margin: 12px 0;
+    padding: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 2px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    word-break: break-word;
+}
+
+.delete-confirm-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
+.delete-confirm-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+}
+
+.delete-confirm-btn:hover {
+    background: #c0392b;
+}
+
+.delete-cancel-btn {
+    background: var(--bg-tertiary);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 6px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+}
+
+.delete-cancel-btn:hover {
+    background: var(--bg-secondary);
+}
+
+/* Edit mode banner */
+.edit-mode-banner {
+    background: var(--accent-bg);
+    color: var(--accent-color);
+    padding: 8px 12px;
+    text-align: center;
+    font-size: 0.8rem;
+    border-bottom: 1px solid var(--accent-color);
+}
+
 /* Print styles */
 @media print {
     .header,
     .input-header,
-    .modal-overlay {
+    .modal-overlay,
+    .delete-confirm-overlay,
+    .edit-mode-banner {
         display: none;
     }
     

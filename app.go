@@ -20,7 +20,6 @@ import (
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.design/x/hotkey"
 	"github.com/yuin/goldmark"
-	"github.com/dsimmer/systray"
 	_ "modernc.org/sqlite"
 )
 
@@ -130,9 +129,6 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	
-	// Initialize systray
-	go a.initSystray()
-	
 	// Check if this is the first run
 	if a.settings.FirstRun {
 		fmt.Println("First run detected - showing setup window")
@@ -160,9 +156,6 @@ func (a *App) shutdown(ctx context.Context) {
 		a.db.Close()
 		fmt.Println("Database connection closed")
 	}
-	
-	// Quit systray
-	systray.Quit()
 }
 
 // initDatabase initializes the SQLite database
@@ -259,9 +252,78 @@ func (a *App) createTables() error {
 	return nil
 }
 
+// GetEntryForEdit returns the entry content for editing (used by /edit command)
+func (a *App) GetEntryForEdit(id int) (string, error) {
+	entry, err := a.GetEntryByID(id)
+	if err != nil {
+		return "", err
+	}
+	return entry.Content, nil
+}
+
+// GetEntryPreview returns a preview of the entry (first 100 chars) for delete confirmation
+func (a *App) GetEntryPreview(id int) (string, error) {
+	entry, err := a.GetEntryByID(id)
+	if err != nil {
+		return "", err
+	}
+	preview := entry.Content
+	if len(preview) > 100 {
+		preview = preview[:100] + "..."
+	}
+	return preview, nil
+}
+
 // ProcessCommand handles slash commands
 func (a *App) ProcessCommand(command string) error {
 	fmt.Printf("Processing command: %s\n", command)
+	
+	command = strings.TrimSpace(command)
+	
+	// Handle commands with arguments
+	if strings.HasPrefix(command, "/edit ") {
+		parts := strings.Fields(command)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid edit command. Usage: /edit <entry-id>")
+		}
+		
+		var entryID int
+		if _, err := fmt.Sscanf(parts[1], "%d", &entryID); err != nil {
+			return fmt.Errorf("invalid entry ID: %s", parts[1])
+		}
+		
+		// Get entry content for editing
+		content, err := a.GetEntryForEdit(entryID)
+		if err != nil {
+			return err
+		}
+		
+		// Return special error format that frontend can parse
+		// Format: EDIT_MODE:<id>:<content>
+		return fmt.Errorf("EDIT_MODE:%d:%s", entryID, content)
+	}
+	
+	if strings.HasPrefix(command, "/delete ") {
+		parts := strings.Fields(command)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid delete command. Usage: /delete <entry-id>")
+		}
+		
+		var entryID int
+		if _, err := fmt.Sscanf(parts[1], "%d", &entryID); err != nil {
+			return fmt.Errorf("invalid entry ID: %s", parts[1])
+		}
+		
+		// Get entry preview for confirmation
+		preview, err := a.GetEntryPreview(entryID)
+		if err != nil {
+			return err
+		}
+		
+		// Return special error format for confirmation
+		// Format: DELETE_CONFIRM:<id>:<preview>
+		return fmt.Errorf("DELETE_CONFIRM:%d:%s", entryID, preview)
+	}
 	
 	switch command {
 	case "/dash":
@@ -270,7 +332,7 @@ func (a *App) ProcessCommand(command string) error {
 		a.OpenSettings()
 		return nil
 	default:
-		return fmt.Errorf("unknown command: %s. Available commands: /dash, /settings, /stats", command)
+		return fmt.Errorf("unknown command: %s. Available commands: /dash, /settings, /edit <id>, /delete <id>", command)
 	}
 }
 
@@ -485,6 +547,7 @@ func (a *App) getDashboardData() (*DisplayDashboardData, error) {
             entriesJSON[j] = map[string]interface{}{
                 "id":        entry.ID,
                 "content":   entry.RenderedHTML,
+                "rawContent": entry.Content,
                 "localTime": entry.LocalTime,
                 "date":      entry.DateString,
             }
@@ -726,6 +789,93 @@ func (a *App) GetLogEntriesCount() (int, error) {
 	return count, nil
 }
 
+// GetEntryByID retrieves a log entry by its ID
+func (a *App) GetEntryByID(id int) (*LogEntry, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+
+	var entry LogEntry
+	query := `SELECT id, content, created_at FROM log_entries WHERE id = ?`
+	err := a.db.QueryRow(query, id).Scan(&entry.ID, &entry.Content, &entry.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("entry not found: %v", err)
+	}
+
+	return &entry, nil
+}
+
+// UpdateEntry updates the content of an existing log entry
+func (a *App) UpdateEntry(id int, newContent string) error {
+	if a.db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	if newContent == "" {
+		return fmt.Errorf("content cannot be empty")
+	}
+
+	// First verify the entry exists
+	_, err := a.GetEntryByID(id)
+	if err != nil {
+		return fmt.Errorf("entry not found: %v", err)
+	}
+
+	// Update the entry
+	query := `UPDATE log_entries SET content = ? WHERE id = ?`
+	result, err := a.db.Exec(query, newContent, id)
+	if err != nil {
+		return fmt.Errorf("failed to update entry: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check update result: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("entry not found or not updated")
+	}
+
+	// Update tags for the entry
+	if err := a.processTags(int64(id), newContent); err != nil {
+		fmt.Printf("Warning: failed to update tags for entry %d: %v\n", id, err)
+	}
+
+	return nil
+}
+
+// DeleteEntry deletes a log entry by its ID
+func (a *App) DeleteEntry(id int) error {
+	if a.db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	// First verify the entry exists
+	_, err := a.GetEntryByID(id)
+	if err != nil {
+		return fmt.Errorf("entry not found: %v", err)
+	}
+
+	// Delete the entry (cascade will handle tags)
+	query := `DELETE FROM log_entries WHERE id = ?`
+	result, err := a.db.Exec(query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete entry: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check delete result: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("entry not found or not deleted")
+	}
+
+	return nil
+}
+
 // Tag represents a tag in the database
 type Tag struct {
 	ID        int64     `json:"id"`
@@ -860,9 +1010,8 @@ func (a *App) ShowWindow() {
 
 // HideWindow hides the app window
 func (a *App) HideWindow() {
-	// Use Hide instead of Minimize since systray handles the dock/menubar icon
-	// This prevents screen switching issues on macOS
-	wailsRuntime.WindowHide(a.ctx)
+	// Use Minimize to keep the app accessible from the dock/taskbar
+	wailsRuntime.WindowMinimise(a.ctx)
 }
 
 // GetDatabasePath returns the current database file path
@@ -920,54 +1069,6 @@ func (a *App) ClearDashboardFiles() (string, error) {
 func (a *App) Quit() {
 	fmt.Println("Quitting SnapLog...")
 	wailsRuntime.Quit(a.ctx)
-}
-
-// initSystray initializes the system tray with menu items
-func (a *App) initSystray() {
-	systray.Run(func() {
-		// Set the app icon if available
-		switch runtime.GOOS {
-		case "windows":
-			if len(appIconWindows) > 0 {
-				systray.SetIcon(appIconWindows)
-			}
-		default:
-			if len(appIcon) > 0 {
-				systray.SetIcon(appIcon)
-			}
-		}
-
-		// Optional tooltip on hover
-		systray.SetTooltip("SnapLog")
-
-		// Add "Show App" menu item
-		mShow := systray.AddMenuItem("Show App", "Show SnapLog window")
-		mShow.Click(func() {
-			a.ShowWindow()
-		})
-
-		// Add separator
-		systray.AddSeparator()
-
-		// Add "Quit App" menu item
-		mQuit := systray.AddMenuItem("Quit App", "Quit SnapLog")
-		mQuit.Click(func() {
-			a.Quit()
-		})
-
-		// Ensure the menu is shown on right-click (macOS requires this)
-		systray.SetOnRClick(func(menu systray.IMenu) {
-			menu.ShowMenu()
-		})
-
-		// Left click (or tap) brings the app window to front
-		systray.SetOnClick(func(menu systray.IMenu) {
-			a.ShowWindow()
-		})
-	}, func() {
-		// onExit callback - cleanup if needed
-		fmt.Println("Systray exited")
-	})
 }
 
 // startHotkeyDetection registers a global hotkey using golang.design/x/hotkey

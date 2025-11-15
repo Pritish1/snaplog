@@ -1,6 +1,6 @@
 import {useState, useEffect} from 'react';
 import './App.css';
-import {LogText, HideWindow, Quit, GetSettings, SetSettings, RenderMarkdown, ProcessCommand, ClearAllData, GetDatabasePath, GetDashboardPath, ClearDashboardFiles} from "../wailsjs/go/main/App";
+import {LogText, HideWindow, Quit, GetSettings, SetSettings, RenderMarkdown, ProcessCommand, ClearAllData, GetDatabasePath, GetDashboardPath, ClearDashboardFiles, UpdateEntry, DeleteEntry} from "../wailsjs/go/main/App";
 import {EventsOn} from "../wailsjs/runtime/runtime";
 
 function App() {
@@ -15,6 +15,9 @@ function App() {
     const [dashboardPath, setDashboardPath] = useState('');
     const [dashboardCleanupMessage, setDashboardCleanupMessage] = useState('');
     const [dashboardCleanupStatus, setDashboardCleanupStatus] = useState('success');
+    const [editingEntryId, setEditingEntryId] = useState(null);
+    const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+    const [deleteConfirmPreview, setDeleteConfirmPreview] = useState('');
     
     // Detect macOS
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0 || navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
@@ -82,7 +85,15 @@ function App() {
     const handleTextChange = (e) => setText(e.target.value);
 
     const logText = async () => {
+        // If text is empty, just minimize the window
         if (!text.trim()) {
+            // If in edit mode, cancel edit
+            if (editingEntryId) {
+                setEditingEntryId(null);
+            }
+            setTimeout(() => {
+                HideWindow();
+            }, 100);
             return;
         }
 
@@ -105,6 +116,73 @@ function App() {
                 console.error('Error processing command:', error);
                 return;
             }
+        }
+
+        // Check for edit/delete commands
+        if (trimmedText.startsWith('/edit ') || trimmedText.startsWith('/delete ')) {
+            try {
+                await ProcessCommand(trimmedText);
+                // If ProcessCommand succeeds, it shouldn't happen for edit/delete
+                // They should return errors with special format
+                setText('');
+                setTimeout(() => {
+                    HideWindow();
+                }, 100);
+            } catch (error) {
+                // ProcessCommand returns an error, but we use it to pass data
+                const errorMsg = error?.message || error?.toString() || '';
+                
+                if (errorMsg.startsWith('EDIT_MODE:')) {
+                    // Parse EDIT_MODE:<id>:<content>
+                    const parts = errorMsg.split(':');
+                    if (parts.length >= 3) {
+                        const entryId = parseInt(parts[1]);
+                        const content = parts.slice(2).join(':'); // Rejoin in case content has colons
+                        setEditingEntryId(entryId);
+                        setText(content);
+                        // Don't hide window, allow editing
+                        return;
+                    }
+                } else if (errorMsg.startsWith('DELETE_CONFIRM:')) {
+                    // Parse DELETE_CONFIRM:<id>:<preview>
+                    const parts = errorMsg.split(':');
+                    if (parts.length >= 3) {
+                        const entryId = parseInt(parts[1]);
+                        const preview = parts.slice(2).join(':'); // Rejoin in case preview has colons
+                        setDeleteConfirmId(entryId);
+                        setDeleteConfirmPreview(preview);
+                        setText(''); // Clear the input
+                        // Don't hide window, show confirmation
+                        return;
+                    }
+                } else {
+                    // Actual error
+                    console.error('Error processing command:', errorMsg);
+                    setText('');
+                    setTimeout(() => {
+                        HideWindow();
+                    }, 100);
+                }
+                return;
+            }
+        }
+
+        // If in edit mode, update the entry
+        if (editingEntryId) {
+            try {
+                await UpdateEntry(editingEntryId, text);
+                setText(''); // Clear the input
+                setEditingEntryId(null); // Exit edit mode
+                
+                // Hide the window after successful update
+                setTimeout(() => {
+                    HideWindow();
+                }, 100);
+            } catch (error) {
+                console.error('Error updating entry:', error);
+                // Show error but stay in edit mode
+            }
+            return;
         }
 
         // Log as regular text (even if it starts with / but isn't a recognized command)
@@ -131,6 +209,16 @@ function App() {
 
     const handleKeyDown = (e) => {
         if (e.key === 'Escape') {
+            // If in edit mode, cancel edit
+            if (editingEntryId) {
+                setEditingEntryId(null);
+                setText('');
+            }
+            // If delete confirmation is open, cancel it
+            if (deleteConfirmId) {
+                handleDeleteCancel();
+                return;
+            }
             // Hide window without saving
             HideWindow();
         } else if (e.key === 'Tab' && (e.ctrlKey || e.metaKey)) {
@@ -230,6 +318,30 @@ function App() {
         }, 4000);
     };
 
+    const handleDeleteConfirm = async () => {
+        if (!deleteConfirmId) return;
+        
+        try {
+            await DeleteEntry(deleteConfirmId);
+            setDeleteConfirmId(null);
+            setDeleteConfirmPreview('');
+            setText('');
+            // Keep window open after successful delete
+        } catch (error) {
+            console.error('Error deleting entry:', error);
+            // Show error but keep confirmation open
+        }
+    };
+
+    const handleDeleteCancel = () => {
+        setDeleteConfirmId(null);
+        setDeleteConfirmPreview('');
+        setText('');
+        setTimeout(() => {
+            HideWindow();
+        }, 100);
+    };
+
     return (
         <div id="App" className={settings.theme === 'light' ? 'theme-light' : 'theme-dark'}>
             <div className="header">
@@ -257,10 +369,33 @@ function App() {
                 </div>
             </div>
             
+            {deleteConfirmId && (
+                <div className="delete-confirm-overlay">
+                    <div className="delete-confirm-dialog">
+                        <h3>Delete Entry?</h3>
+                        <p className="delete-preview">Preview: {deleteConfirmPreview}</p>
+                        <div className="delete-confirm-buttons">
+                            <button className="delete-confirm-btn" onClick={handleDeleteConfirm}>
+                                Delete
+                            </button>
+                            <button className="delete-cancel-btn" onClick={handleDeleteCancel}>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {editingEntryId && (
+                <div className="edit-mode-banner">
+                    Editing entry #{editingEntryId} - Press Enter to save, Esc to cancel
+                </div>
+            )}
+            
             <div className="input-container">
                 <div className="input-header">
                     <span className="mode-indicator">
-                        {previewMode ? 'Preview Mode' : 'Edit Mode'}
+                        {editingEntryId ? `Editing Entry #${editingEntryId}` : (previewMode ? 'Preview Mode' : 'Edit Mode')}
                     </span>
                     <button 
                         className="preview-toggle"
@@ -274,6 +409,8 @@ function App() {
                 {previewMode ? (
                     <div 
                         className="markdown-preview"
+                        onKeyDown={handleKeyDown}
+                        tabIndex={0}
                         dangerouslySetInnerHTML={{ 
                             __html: renderedHtml || '<p><em>No content to preview</em></p>' 
                         }}
