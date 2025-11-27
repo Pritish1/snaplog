@@ -44,23 +44,6 @@ type LogEntry struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// DayGroup represents a group of entries for a specific day
-type DayGroup struct {
-	DayName string    `json:"day_name"`
-	Date    string    `json:"date"`
-	Count   int       `json:"count"`
-	Entries []LogEntry `json:"entries"`
-}
-
-// DashboardData represents the data structure for the dashboard
-type DashboardData struct {
-	TotalEntries int        `json:"total_entries"`
-	TotalDays    int        `json:"total_days"`
-	ThisWeek     int        `json:"this_week"`
-	Generated    string     `json:"generated"`
-	DayGroups    []DayGroup `json:"day_groups"`
-}
-
 // DisplayEntry represents a log entry formatted for display
 type DisplayEntry struct {
 	ID           int             `json:"id"`
@@ -90,9 +73,6 @@ type DisplayDashboardData struct {
 	LogoData     template.URL     `json:"logo_data"`
 	OriginalJSONRaw template.JS   `json:"original_json_raw"`
 }
-
-
-
 // App struct
 type App struct {
 	ctx          context.Context
@@ -115,55 +95,42 @@ func NewApp() *App {
 	}
 }
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	a.hotkeyId = uintptr(1) // Initialize hotkey ID
+	a.hotkeyId = uintptr(1)
 	
-	// Initialize logging
 	if err := a.initLogging(); err != nil {
 		fmt.Printf("Warning: Failed to initialize logging: %v\n", err)
 	}
 	
-	// Load settings from file
 	a.loadSettings()
 	
-	// Initialize database
 	if err := a.initDatabase(); err != nil {
 		a.logf("Failed to initialize database: %v\n", err)
 		return
 	}
 	
-	// Check if this is the first run
 	if a.settings.FirstRun {
 		a.logf("First run detected - showing setup window\n")
-		// Show window for first-time setup and emit event to open settings
 		go func() {
-			time.Sleep(500 * time.Millisecond) // Wait for window to be ready
+			time.Sleep(500 * time.Millisecond)
 			a.ShowWindow()
 			wailsRuntime.EventsEmit(a.ctx, "show-first-run-setup")
 		}()
 	} else {
-		// For subsequent runs, just start hotkey detection
-		// Window will be visible by default (StartHidden removed)
 		go a.startHotkeyDetection()
 	}
 }
 
-// shutdown is called when the app is shutting down
 func (a *App) shutdown(ctx context.Context) {
 	a.logf("Shutting down SnapLog...\n")
-	// Stop hotkey detection if running
 	a.stopHotkeyDetection()
 	
-	// Close database connection
 	if a.db != nil {
 		a.db.Close()
 		a.logf("Database connection closed\n")
 	}
 	
-	// Close log file
 	if a.logFile != nil {
 		a.logFile.Close()
 		a.logFile = nil
@@ -200,65 +167,53 @@ func (a *App) initLogging() error {
 	return nil
 }
 
-// logf writes a formatted message to both log file and stdout
 func (a *App) logf(format string, args ...interface{}) {
 	message := fmt.Sprintf(format, args...)
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	logMessage := fmt.Sprintf("[%s] %s", timestamp, message)
 	
-	// Write to log file
 	if a.logFile != nil {
 		a.logFile.WriteString(logMessage)
-		a.logFile.Sync() // Ensure it's written immediately
+		a.logFile.Sync()
 	}
 	
-	// Also write to stdout
 	fmt.Print(logMessage)
 }
 
 
-// initDatabase initializes the SQLite database
 func (a *App) initDatabase() error {
-	// Get user config directory
 	configDir, err := os.UserConfigDir()
 	if err != nil {
 		return fmt.Errorf("failed to get config directory: %v", err)
 	}
 	
-	// Create snaplog directory if it doesn't exist
 	snaplogDir := filepath.Join(configDir, "snaplog")
 	if err := os.MkdirAll(snaplogDir, 0755); err != nil {
 		return fmt.Errorf("failed to create snaplog directory: %v", err)
 	}
 	
-	// Database file path
 	dbPath := filepath.Join(snaplogDir, "snaplog.db")
 	
-	// Open database connection
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return fmt.Errorf("failed to open database: %v", err)
 	}
 	
-	// Test connection
 	if err := db.Ping(); err != nil {
 		return fmt.Errorf("failed to ping database: %v", err)
 	}
 	
 	a.db = db
 	
-	// Create tables
 	if err := a.createTables(); err != nil {
 		return fmt.Errorf("failed to create tables: %v", err)
 	}
 	
-	fmt.Printf("Database initialized at: %s\n", dbPath)
+	a.logf("Database initialized at: %s\n", dbPath)
 	return nil
 }
 
-// createTables creates the necessary database tables
 func (a *App) createTables() error {
-	// Create log_entries table
 	createEntriesTableSQL := `
 	CREATE TABLE IF NOT EXISTS log_entries (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -270,7 +225,6 @@ func (a *App) createTables() error {
 		return fmt.Errorf("failed to create log_entries table: %v", err)
 	}
 	
-	// Create tags table
 	createTagsTableSQL := `
 	CREATE TABLE IF NOT EXISTS tags (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -282,7 +236,6 @@ func (a *App) createTables() error {
 		return fmt.Errorf("failed to create tags table: %v", err)
 	}
 	
-	// Create junction table for many-to-many relationship
 	createJunctionTableSQL := `
 	CREATE TABLE IF NOT EXISTS log_entries_tags (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -298,7 +251,6 @@ func (a *App) createTables() error {
 		return fmt.Errorf("failed to create log_entries_tags table: %v", err)
 	}
 	
-	// Create indexes for better query performance
 	createIndexSQL := `
 	CREATE INDEX IF NOT EXISTS idx_log_entries_tags_entry ON log_entries_tags(log_entry_id);
 	CREATE INDEX IF NOT EXISTS idx_log_entries_tags_tag ON log_entries_tags(tag_id);
@@ -311,7 +263,6 @@ func (a *App) createTables() error {
 	return nil
 }
 
-// GetEntryForEdit returns the entry content for editing (used by /edit command)
 func (a *App) GetEntryForEdit(id int) (string, error) {
 	entry, err := a.GetEntryByID(id)
 	if err != nil {
@@ -320,7 +271,6 @@ func (a *App) GetEntryForEdit(id int) (string, error) {
 	return entry.Content, nil
 }
 
-// GetEntryPreview returns a preview of the entry (first 100 chars) for delete confirmation
 func (a *App) GetEntryPreview(id int) (string, error) {
 	entry, err := a.GetEntryByID(id)
 	if err != nil {
@@ -333,13 +283,11 @@ func (a *App) GetEntryPreview(id int) (string, error) {
 	return preview, nil
 }
 
-// ProcessCommand handles slash commands
 func (a *App) ProcessCommand(command string) error {
-	fmt.Printf("Processing command: %s\n", command)
+	a.logf("Processing command: %s\n", command)
 	
 	command = strings.TrimSpace(command)
 	
-	// Handle commands with arguments
 	if strings.HasPrefix(command, "/edit ") {
 		parts := strings.Fields(command)
 		if len(parts) != 2 {
@@ -351,14 +299,10 @@ func (a *App) ProcessCommand(command string) error {
 			return fmt.Errorf("invalid entry ID: %s", parts[1])
 		}
 		
-		// Get entry content for editing
 		content, err := a.GetEntryForEdit(entryID)
 		if err != nil {
 			return err
 		}
-		
-		// Return special error format that frontend can parse
-		// Format: EDIT_MODE:<id>:<content>
 		return fmt.Errorf("EDIT_MODE:%d:%s", entryID, content)
 	}
 	
@@ -373,14 +317,10 @@ func (a *App) ProcessCommand(command string) error {
 			return fmt.Errorf("invalid entry ID: %s", parts[1])
 		}
 		
-		// Get entry preview for confirmation
 		preview, err := a.GetEntryPreview(entryID)
 		if err != nil {
 			return err
 		}
-		
-		// Return special error format for confirmation
-		// Format: DELETE_CONFIRM:<id>:<preview>
 		return fmt.Errorf("DELETE_CONFIRM:%d:%s", entryID, preview)
 	}
 	
@@ -391,76 +331,56 @@ func (a *App) ProcessCommand(command string) error {
 		a.OpenSettings()
 		return nil
 	case "/editprev":
-		// Get the most recent entry
 		entry, err := a.GetMostRecentEntry()
 		if err != nil {
 			return err
 		}
-		
-		// Return special error format that frontend can parse
-		// Format: EDIT_MODE:<id>:<content>
 		return fmt.Errorf("EDIT_MODE:%d:%s", entry.ID, entry.Content)
 	case "/delprev":
-		// Get the most recent entry
 		entry, err := a.GetMostRecentEntry()
 		if err != nil {
 			return err
 		}
-		
-		// Get entry preview for confirmation
 		preview := entry.Content
 		if len(preview) > 100 {
 			preview = preview[:100] + "..."
 		}
-		
-		// Return special error format for confirmation
-		// Format: DELETE_CONFIRM:<id>:<preview>
 		return fmt.Errorf("DELETE_CONFIRM:%d:%s", entry.ID, preview)
 	default:
 		return fmt.Errorf("unknown command: %s. Available commands: /dash, /settings, /edit <id>, /delete <id>, /editprev, /delprev", command)
 	}
 }
-
-
-
-// LogText saves text to the SQLite database with timestamp
 func (a *App) LogText(text string) error {
 	if text == "" {
 		return nil
 	}
 
-	fmt.Printf("LogText called with: '%s'\n", text)
+	a.logf("LogText called with: '%s'\n", text)
 
 	if a.db == nil {
 		return fmt.Errorf("database not initialized")
 	}
 
-	// Insert text into database
 	query := `INSERT INTO log_entries (content) VALUES (?)`
 	result, err := a.db.Exec(query, text)
 	if err != nil {
 		return fmt.Errorf("failed to insert log entry: %v", err)
 	}
 
-	// Get the inserted entry ID
 	entryID, err := result.LastInsertId()
 	if err != nil {
-		fmt.Printf("Warning: failed to get last insert ID: %v\n", err)
+		a.logf("Warning: failed to get last insert ID: %v\n", err)
 	} else {
-		// Extract and save tags
 		if err := a.processTags(entryID, text); err != nil {
-			fmt.Printf("Warning: failed to process tags: %v\n", err)
+			a.logf("Warning: failed to process tags: %v\n", err)
 		}
 	}
 
-	fmt.Printf("Logged text: %s\n", text)
+	a.logf("Logged text: %s\n", text)
 	return nil
 }
 
-// processTags extracts hashtags from text and creates associations
 func (a *App) processTags(entryID int64, text string) error {
-	// Extract tags using regex - matches #word, #word123, #word-word, etc.
-	// But not # at end of line or followed by special chars that can't be in tags
 	tagPattern := regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
 	matches := tagPattern.FindAllStringSubmatch(text, -1)
 	
@@ -468,55 +388,42 @@ func (a *App) processTags(entryID int64, text string) error {
 		return nil
 	}
 
-	// Process each tag
 	for _, match := range matches {
 		tagName := match[1]
-		
-		// Get or create tag
 		tagID, err := a.getOrCreateTag(tagName)
 		if err != nil {
-			fmt.Printf("Warning: failed to get or create tag '%s': %v\n", tagName, err)
+			a.logf("Warning: failed to get or create tag '%s': %v\n", tagName, err)
 			continue
 		}
 		
-		// Create association if it doesn't exist
-		insertJunctionSQL := `
-		INSERT OR IGNORE INTO log_entries_tags (log_entry_id, tag_id)
-		VALUES (?, ?)`
-		
+		insertJunctionSQL := `INSERT OR IGNORE INTO log_entries_tags (log_entry_id, tag_id) VALUES (?, ?)`
 		if _, err := a.db.Exec(insertJunctionSQL, entryID, tagID); err != nil {
-			fmt.Printf("Warning: failed to create tag association: %v\n", err)
+			a.logf("Warning: failed to create tag association: %v\n", err)
 		}
 	}
 	
 	return nil
 }
 
-// getOrCreateTag returns the ID of a tag, creating it if necessary
 func (a *App) getOrCreateTag(tagName string) (int64, error) {
-	// Try to get existing tag
 	var tagID int64
 	query := `SELECT id FROM tags WHERE name = ?`
 	err := a.db.QueryRow(query, tagName).Scan(&tagID)
 	
 	if err == nil {
-		// Tag exists
 		return tagID, nil
 	}
 	
 	if err != sql.ErrNoRows {
-		// Error other than "not found"
 		return 0, fmt.Errorf("failed to query tag: %v", err)
 	}
 	
-	// Tag doesn't exist, create it
 	insertSQL := `INSERT INTO tags (name) VALUES (?)`
 	result, err := a.db.Exec(insertSQL, tagName)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create tag: %v", err)
 	}
 	
-	// Get the new tag's ID
 	tagID, err = result.LastInsertId()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get tag ID: %v", err)
@@ -525,75 +432,58 @@ func (a *App) getOrCreateTag(tagName string) (int64, error) {
 	return tagID, nil
 }
 
-// ClearAllData deletes all log entries from the database
 func (a *App) ClearAllData() error {
 	if a.db == nil {
 		return fmt.Errorf("database not initialized")
 	}
 
-	// Delete all entries from database
 	query := `DELETE FROM log_entries`
 	_, err := a.db.Exec(query)
 	if err != nil {
 		return fmt.Errorf("failed to delete log entries: %v", err)
 	}
 
-	fmt.Println("All log entries deleted successfully")
+	a.logf("All log entries deleted successfully\n")
 	return nil
 }
 
-// generateDashboard creates an HTML dashboard with all log entries
 func (a *App) generateDashboard() error {
-	fmt.Println("Starting dashboard generation...")
+	a.logf("Starting dashboard generation...\n")
 	
 	data, err := a.getDashboardData()
 	if err != nil {
-		fmt.Printf("Error getting dashboard data: %v\n", err)
 		return fmt.Errorf("failed to get dashboard data: %v", err)
 	}
-	fmt.Println("Dashboard data prepared successfully")
 
 	htmlContent, err := a.generateHTMLFromTemplate(data)
 	if err != nil {
-		fmt.Printf("Error generating HTML from template: %v\n", err)
 		return fmt.Errorf("failed to generate HTML from template: %v", err)
 	}
-	fmt.Println("HTML content generated from template successfully")
 
-	err = a.saveAndOpenDashboard(htmlContent)
-	if err != nil {
-		fmt.Printf("Error saving and opening dashboard: %v\n", err)
+	if err := a.saveAndOpenDashboard(htmlContent); err != nil {
 		return fmt.Errorf("failed to save and open dashboard: %v", err)
 	}
 
-	fmt.Println("Dashboard generated and opened successfully!")
+	a.logf("Dashboard generated and opened successfully\n")
 	return nil
 }
 
-// getDashboardData prepares data for the dashboard with proper formatting
 func (a *App) getDashboardData() (*DisplayDashboardData, error) {
-	// Get all log entries
 	entries, err := a.GetLogEntries(1000)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get log entries: %v", err)
 	}
 	
-	// Get total count
 	totalCount, err := a.GetLogEntriesCount()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get log count: %v", err)
 	}
 	
-	// Convert entries to display format with local time and rendered markdown
 	displayEntries := make([]DisplayEntry, len(entries))
 	for i, entry := range entries {
-		// Convert UTC to local time
 		localTime := entry.CreatedAt.Local()
-		
-		// Render markdown to HTML
 		renderedHTML, err := a.RenderMarkdown(entry.Content)
 		if err != nil {
-			// If markdown rendering fails, use plain text
 			renderedHTML = fmt.Sprintf("<p>%s</p>", strings.ReplaceAll(entry.Content, "\n", "<br>"))
 		}
 		
@@ -607,17 +497,13 @@ func (a *App) getDashboardData() (*DisplayDashboardData, error) {
 		}
 	}
 	
-	// Group entries by day using local time
 	dayGroups := a.groupDisplayEntriesByDay(displayEntries)
-	
-	// Calculate statistics
 	thisWeek := a.calculateThisWeekCount(entries)
 	
-	// Get all tags
 	tags, err := a.GetTags()
 	if err != nil {
-		fmt.Printf("Warning: failed to get tags: %v\n", err)
-		tags = []Tag{} // Use empty slice if tags fail
+		a.logf("Warning: failed to get tags: %v\n", err)
+		tags = []Tag{}
 	}
 	
 	var logoData template.URL
@@ -679,12 +565,10 @@ func (a *App) getDashboardData() (*DisplayDashboardData, error) {
     }, nil
 }
 
-// groupDisplayEntriesByDay groups display entries by day using local time
 func (a *App) groupDisplayEntriesByDay(entries []DisplayEntry) []DisplayDayGroup {
 	dayMap := make(map[string][]DisplayEntry)
 	
 	for _, entry := range entries {
-		// Use local time for grouping
 		localTime := entry.CreatedAt.Local()
 		dayKey := localTime.Format("2006-01-02")
 		dayMap[dayKey] = append(dayMap[dayKey], entry)
@@ -692,20 +576,16 @@ func (a *App) groupDisplayEntriesByDay(entries []DisplayEntry) []DisplayDayGroup
 	
 	var dayGroups []DisplayDayGroup
 	for _, dayEntries := range dayMap {
-		// Parse the date using local time
 		localTime := dayEntries[0].CreatedAt.Local()
-	
-		
 		dayGroup := DisplayDayGroup{
 			DayName: localTime.Format("Monday"),
-			Date:    localTime.Format("2006-01-02"), // Use ISO format for JavaScript compatibility
+			Date:    localTime.Format("2006-01-02"),
 			Count:   len(dayEntries),
 			Entries: dayEntries,
 		}
 		dayGroups = append(dayGroups, dayGroup)
 	}
 	
-	// Sort by date (newest first)
 	for i := 0; i < len(dayGroups); i++ {
 		for j := i + 1; j < len(dayGroups); j++ {
 			date1, _ := time.Parse("2006-01-02", dayGroups[i].Date)
@@ -719,7 +599,6 @@ func (a *App) groupDisplayEntriesByDay(entries []DisplayEntry) []DisplayDayGroup
 	return dayGroups
 }
 
-// calculateThisWeekCount counts entries from this week
 func (a *App) calculateThisWeekCount(entries []LogEntry) int {
 	now := time.Now()
 	weekStart := now.AddDate(0, 0, -int(now.Weekday()))
@@ -734,12 +613,9 @@ func (a *App) calculateThisWeekCount(entries []LogEntry) int {
 	return count
 }
 
-// generateHTMLFromTemplate generates HTML from the template file
 func (a *App) generateHTMLFromTemplate(data *DisplayDashboardData) (string, error) {
-	// Try to read from embedded FS first (for binary builds)
 	templateContent, err := templates.ReadFile("templates/dashboard.html")
 	if err != nil {
-		// Fallback to file system (for dev mode)
 		templatePath := filepath.Join(".", "templates", "dashboard.html")
 		templateContent, err = os.ReadFile(templatePath)
 		if err != nil {
@@ -747,64 +623,44 @@ func (a *App) generateHTMLFromTemplate(data *DisplayDashboardData) (string, erro
 		}
 	}
 	
-	// Parse template
 	tmpl, err := template.New("dashboard").Parse(string(templateContent))
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %v", err)
 	}
 	
-	// Execute template
 	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, data)
-	if err != nil {
+	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("failed to execute template: %v", err)
 	}
 	
 	return buf.String(), nil
 }
 
-// saveAndOpenDashboard saves HTML content and opens it in browser
 func (a *App) saveAndOpenDashboard(htmlContent string) error {
-	// Get temp directory path
 	tempPath, err := a.getTempPath()
 	if err != nil {
-		fmt.Printf("Error getting temp path: %v\n", err)
 		return fmt.Errorf("failed to get temp path: %v", err)
 	}
-	fmt.Printf("Temp path: %s\n", tempPath)
 	
-	// Write HTML file
 	htmlFile := filepath.Join(tempPath, "snaplog-dashboard.html")
-	fmt.Printf("Writing HTML file to: %s\n", htmlFile)
-	err = os.WriteFile(htmlFile, []byte(htmlContent), 0644)
-	if err != nil {
-		fmt.Printf("Error writing HTML file: %v\n", err)
+	if err := os.WriteFile(htmlFile, []byte(htmlContent), 0644); err != nil {
 		return fmt.Errorf("failed to write HTML file: %v", err)
 	}
-	fmt.Printf("HTML file written successfully\n")
 	
-	// Open in browser
-	fmt.Printf("Opening browser with file: %s\n", htmlFile)
-	err = a.openInBrowser(htmlFile)
-	if err != nil {
-		fmt.Printf("Error opening browser: %v\n", err)
+	if err := a.openInBrowser(htmlFile); err != nil {
 		return fmt.Errorf("failed to open browser: %v", err)
 	}
-	fmt.Printf("Browser opened successfully\n")
 	
-	fmt.Printf("Dashboard generated: %s\n", htmlFile)
+	a.logf("Dashboard generated: %s\n", htmlFile)
 	return nil
 }
 
-// getTempPath returns a temporary directory path for the HTML file
 func (a *App) getTempPath() (string, error) {
-	// Use the system temp directory
 	tempDir := os.TempDir()
 	if tempDir == "" {
 		return "", fmt.Errorf("could not get temp directory")
 	}
 	
-	// Create snaplog temp directory
 	snaplogTempDir := filepath.Join(tempDir, "snaplog-dashboards")
 	if err := os.MkdirAll(snaplogTempDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create temp dashboard directory: %v", err)
@@ -813,11 +669,9 @@ func (a *App) getTempPath() (string, error) {
 	return snaplogTempDir, nil
 }
 
-// openInBrowser opens the HTML file in the default browser
 func (a *App) openInBrowser(filePath string) error {
 	var cmd *exec.Cmd
 	
-	// Determine the operating system and use appropriate command
 	switch runtime.GOOS {
 	case "windows":
 		cmd = exec.Command("cmd", "/c", "start", "", filePath)
@@ -858,7 +712,6 @@ func (a *App) GetLogEntries(limit int) ([]LogEntry, error) {
 	return entries, nil
 }
 
-// GetLogEntriesCount returns the total number of log entries
 func (a *App) GetLogEntriesCount() (int, error) {
 	if a.db == nil {
 		return 0, fmt.Errorf("database not initialized")
@@ -874,7 +727,6 @@ func (a *App) GetLogEntriesCount() (int, error) {
 	return count, nil
 }
 
-// GetEntryByID retrieves a log entry by its ID
 func (a *App) GetEntryByID(id int) (*LogEntry, error) {
 	if a.db == nil {
 		return nil, fmt.Errorf("database not initialized")
@@ -890,7 +742,6 @@ func (a *App) GetEntryByID(id int) (*LogEntry, error) {
 	return &entry, nil
 }
 
-// GetMostRecentEntry retrieves the most recent log entry
 func (a *App) GetMostRecentEntry() (*LogEntry, error) {
 	if a.db == nil {
 		return nil, fmt.Errorf("database not initialized")
@@ -909,7 +760,6 @@ func (a *App) GetMostRecentEntry() (*LogEntry, error) {
 	return &entry, nil
 }
 
-// UpdateEntry updates the content of an existing log entry
 func (a *App) UpdateEntry(id int, newContent string) error {
 	if a.db == nil {
 		return fmt.Errorf("database not initialized")
@@ -919,13 +769,11 @@ func (a *App) UpdateEntry(id int, newContent string) error {
 		return fmt.Errorf("content cannot be empty")
 	}
 
-	// First verify the entry exists
 	_, err := a.GetEntryByID(id)
 	if err != nil {
 		return fmt.Errorf("entry not found: %v", err)
 	}
 
-	// Update the entry
 	query := `UPDATE log_entries SET content = ? WHERE id = ?`
 	result, err := a.db.Exec(query, newContent, id)
 	if err != nil {
@@ -941,27 +789,23 @@ func (a *App) UpdateEntry(id int, newContent string) error {
 		return fmt.Errorf("entry not found or not updated")
 	}
 
-	// Update tags for the entry
 	if err := a.processTags(int64(id), newContent); err != nil {
-		fmt.Printf("Warning: failed to update tags for entry %d: %v\n", id, err)
+		a.logf("Warning: failed to update tags for entry %d: %v\n", id, err)
 	}
 
 	return nil
 }
 
-// DeleteEntry deletes a log entry by its ID
 func (a *App) DeleteEntry(id int) error {
 	if a.db == nil {
 		return fmt.Errorf("database not initialized")
 	}
 
-	// First verify the entry exists
 	_, err := a.GetEntryByID(id)
 	if err != nil {
 		return fmt.Errorf("entry not found: %v", err)
 	}
 
-	// Delete the entry (cascade will handle tags)
 	query := `DELETE FROM log_entries WHERE id = ?`
 	result, err := a.db.Exec(query, id)
 	if err != nil {
@@ -987,7 +831,6 @@ type Tag struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// GetTags returns all available tags
 func (a *App) GetTags() ([]Tag, error) {
 	if a.db == nil {
 		return nil, fmt.Errorf("database not initialized")
@@ -1013,90 +856,7 @@ func (a *App) GetTags() ([]Tag, error) {
 	return tags, nil
 }
 
-// GetEntriesByTags returns log entries filtered by tags
-func (a *App) GetEntriesByTags(tagNames []string, limit int) ([]LogEntry, error) {
-	if a.db == nil {
-		return nil, fmt.Errorf("database not initialized")
-	}
 
-	if len(tagNames) == 0 {
-		// No tags specified, return all entries
-		return a.GetLogEntries(limit)
-	}
-
-	// Build query to find entries that have ALL specified tags
-	// Using subquery to filter by tag intersection
-	placeholders := strings.Repeat("?,", len(tagNames))
-	placeholders = placeholders[:len(placeholders)-1] // Remove trailing comma
-	
-	query := fmt.Sprintf(`
-	SELECT DISTINCT e.id, e.content, e.created_at
-	FROM log_entries e
-	WHERE e.id IN (
-		SELECT let.log_entry_id
-		FROM log_entries_tags let
-		INNER JOIN tags t ON let.tag_id = t.id
-		WHERE t.name IN (%s)
-		GROUP BY let.log_entry_id
-		HAVING COUNT(DISTINCT t.name) = ?
-	)
-	ORDER BY e.created_at DESC
-	LIMIT ?`, placeholders)
-
-	// Build args: tag names, count of tags, and limit
-	args := make([]interface{}, 0, len(tagNames)+2)
-	for _, tagName := range tagNames {
-		args = append(args, tagName)
-	}
-	args = append(args, len(tagNames), limit)
-
-	rows, err := a.db.Query(query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query entries by tags: %v", err)
-	}
-	defer rows.Close()
-
-	var entries []LogEntry
-	for rows.Next() {
-		var entry LogEntry
-		err := rows.Scan(&entry.ID, &entry.Content, &entry.CreatedAt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan log entry: %v", err)
-		}
-		entries = append(entries, entry)
-	}
-
-	return entries, nil
-}
-
-// SearchLogEntries searches for log entries containing the given text
-func (a *App) SearchLogEntries(searchText string, limit int) ([]LogEntry, error) {
-	if a.db == nil {
-		return nil, fmt.Errorf("database not initialized")
-	}
-
-	query := `SELECT id, content, created_at FROM log_entries WHERE content LIKE ? ORDER BY created_at DESC LIMIT ?`
-	searchPattern := "%" + searchText + "%"
-	rows, err := a.db.Query(query, searchPattern, limit)
-	if err != nil {
-		return nil, fmt.Errorf("failed to search log entries: %v", err)
-	}
-	defer rows.Close()
-
-	var entries []LogEntry
-	for rows.Next() {
-		var entry LogEntry
-		err := rows.Scan(&entry.ID, &entry.Content, &entry.CreatedAt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan log entry: %v", err)
-		}
-		entries = append(entries, entry)
-	}
-
-	return entries, nil
-}
-
-// RenderMarkdown converts Markdown text to HTML
 func (a *App) RenderMarkdown(markdown string) (string, error) {
 	var buf bytes.Buffer
 	md := goldmark.New()
@@ -1106,19 +866,15 @@ func (a *App) RenderMarkdown(markdown string) (string, error) {
 	return buf.String(), nil
 }
 
-// ShowWindow brings the app window to the front
 func (a *App) ShowWindow() {
 	wailsRuntime.WindowShow(a.ctx)
 	wailsRuntime.WindowUnminimise(a.ctx)
 }
 
-// HideWindow hides the app window
 func (a *App) HideWindow() {
-	// Use Minimize to keep the app accessible from the dock/taskbar
 	wailsRuntime.WindowMinimise(a.ctx)
 }
 
-// GetDatabasePath returns the current database file path
 func (a *App) GetDatabasePath() string {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
@@ -1128,7 +884,6 @@ func (a *App) GetDatabasePath() string {
 	return filepath.Join(snaplogDir, "snaplog.db")
 }
 
-// GetDashboardPath returns the dashboard directory path
 func (a *App) GetDashboardPath() string {
 	tempPath, err := a.getTempPath()
 	if err != nil {
@@ -1137,7 +892,6 @@ func (a *App) GetDashboardPath() string {
 	return tempPath
 }
 
-// ClearDashboardFiles removes generated dashboard HTML files from the temp directory
 func (a *App) ClearDashboardFiles() (string, error) {
     tempPath, err := a.getTempPath()
     if err != nil {
@@ -1169,20 +923,16 @@ func (a *App) ClearDashboardFiles() (string, error) {
     return message, nil
 }
 
-// Quit closes the application
 func (a *App) Quit() {
-	fmt.Println("Quitting SnapLog...")
+	a.logf("Quitting SnapLog...\n")
 	wailsRuntime.Quit(a.ctx)
 }
 
-// startHotkeyDetection registers a global hotkey using golang.design/x/hotkey
 func (a *App) startHotkeyDetection() {
-	fmt.Println("Starting hotkey detection...")
+	a.logf("Starting hotkey detection...\n")
 	
-	// Parse modifiers from settings (platform-specific implementation)
 	modifiers := parseModifiers(a.settings.HotkeyModifiers)
 	
-	// Parse key from settings
 	var key hotkey.Key
 	switch a.settings.HotkeyKey {
 	case "l":
@@ -1196,127 +946,70 @@ func (a *App) startHotkeyDetection() {
 	case "space":
 		key = hotkey.KeySpace
 	default:
-		key = hotkey.KeyL // Default to L
+		key = hotkey.KeyL
 	}
 	
-	// Register hotkey
 	hk := hotkey.New(modifiers, key)
 	
-	err := hk.Register()
-	if err != nil {
-		fmt.Printf("Failed to register hotkey: %v\n", err)
-		fmt.Println("Note: On macOS, this requires accessibility permissions.")
-		fmt.Println("Go to System Preferences > Security & Privacy > Privacy > Accessibility")
-		fmt.Println("On Linux, you may need to install additional packages or configure X11.")
+	if err := hk.Register(); err != nil {
+		a.logf("Failed to register hotkey: %v\n", err)
+		a.logf("Note: On macOS, this requires accessibility permissions.\n")
 		return
 	}
 	
-	fmt.Printf("Hotkey registered: %v+%v\n", a.settings.HotkeyModifiers, a.settings.HotkeyKey)
-	
-	// Store the hotkey for cleanup
+	a.logf("Hotkey registered: %v+%v\n", a.settings.HotkeyModifiers, a.settings.HotkeyKey)
 	a.packageHotkey = hk
 	
-	// Listen for hotkey events in a goroutine
 	go func() {
 		for {
 			select {
 			case <-hk.Keydown():
-				fmt.Println("Hotkey detected! Showing window...")
+				a.logf("Hotkey detected! Showing window...\n")
 				a.ShowWindow()
 			}
 		}
 	}()
 }
 
-// stopHotkeyDetection stops the hotkey detection
 func (a *App) stopHotkeyDetection() {
 	if a.packageHotkey != nil {
-		fmt.Println("Unregistering hotkey...")
+		a.logf("Unregistering hotkey...\n")
 		a.packageHotkey.Unregister()
 		a.packageHotkey = nil
 	}
 }
 
-// CheckAccessibilityPermissions returns true if accessibility permissions are granted (macOS)
-func (a *App) CheckAccessibilityPermissions() bool {
-	// This is a simple check - if we can register a hotkey, permissions are granted
-	if a.packageHotkey != nil {
-		return true
-	}
-	return false
-}
-
-// RequestAccessibilityPermissions prompts the user to grant accessibility permissions (macOS)
-func (a *App) RequestAccessibilityPermissions() {
-	fmt.Println("SnapLog requires accessibility permissions to register global hotkeys.")
-	fmt.Println("Please grant accessibility permissions in System Preferences > Security & Privacy > Privacy > Accessibility")
-	fmt.Println("After granting permissions, restart SnapLog.")
-}
-
-
-// OpenSettings opens the settings modal
 func (a *App) OpenSettings() {
-	// Show the main window first
 	a.ShowWindow()
-	// Then emit the event to open settings modal
 	wailsRuntime.EventsEmit(a.ctx, "open-settings")
 }
 
-// IsFirstRun checks if this is the first run of the app
 func (a *App) IsFirstRun() bool {
 	return a.settings.FirstRun
 }
 
-// ShowInstructions shows keyboard shortcuts and usage instructions
-func (a *App) ShowInstructions() {
-	fmt.Println("\n=== SnapLog CLI Instructions ===")
-	fmt.Println("\nKeyboard Shortcuts:")
-	fmt.Println("  Enter        - Log text and hide window")
-	fmt.Println("  Shift+Enter  - Create a new line")
-	fmt.Println("  Ctrl+Tab     - Toggle Markdown preview")
-	fmt.Println("  Esc          - Hide window without saving")
-	fmt.Println("\nCommands:")
-	fmt.Println("  /dash        - Generate HTML dashboard and open in browser")
-	fmt.Println("\nMarkdown Support:")
-	fmt.Println("  # Header     - Create headers")
-	fmt.Println("  **bold**     - Bold text")
-	fmt.Println("  *italic*     - Italic text")
-	fmt.Println("  `code`       - Inline code")
-	fmt.Println("  - list       - Bullet lists")
-	fmt.Println("\nSettings:")
-	fmt.Println("  Type /settings or click the settings button to configure hotkey")
-	fmt.Printf("  Current hotkey: %v+%v\n", a.settings.HotkeyModifiers, a.settings.HotkeyKey)
-	fmt.Println("\n===============================")
-}
-
-// GetSettings returns the current settings
 func (a *App) GetSettings() *Settings {
 	return a.settings
 }
 
-// SetSettings updates the settings and saves them
 func (a *App) SetSettings(settings *Settings) error {
 	a.settings = settings
-	// Mark that setup is complete
 	a.settings.FirstRun = false
 	
-	// Save settings to file
 	if err := a.saveSettings(); err != nil {
 		return fmt.Errorf("failed to save settings: %v", err)
 	}
 	
-	// Restart hotkey detection with new settings
 	a.stopHotkeyDetection()
 	go a.startHotkeyDetection()
 	
 	return nil
 }
 
-// loadSettings loads settings from file
 func (a *App) loadSettings() {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
-		fmt.Printf("Failed to get config directory: %v\n", err)
+		a.logf("Failed to get config directory: %v\n", err)
 		return
 	}
 	
@@ -1324,36 +1017,31 @@ func (a *App) loadSettings() {
 	
 	data, err := os.ReadFile(settingsFile)
 	if err != nil {
-		// File doesn't exist or can't be read, use defaults
-		fmt.Println("Using default settings (first run)")
+		a.logf("Using default settings (first run)\n")
 		a.settings.FirstRun = true
 		return
 	}
 	
 	var settings Settings
 	if err := json.Unmarshal(data, &settings); err != nil {
-		fmt.Printf("Failed to parse settings: %v\n", err)
+		a.logf("Failed to parse settings: %v\n", err)
 		return
 	}
 	
 	a.settings = &settings
-	// If FirstRun field was not in JSON (old settings), default to true to force first run
-	// Check if the file actually contains the first_run field
 	if !strings.Contains(string(data), "first_run") {
-		fmt.Println("Old settings detected - forcing first run")
+		a.logf("Old settings detected - forcing first run\n")
 		a.settings.FirstRun = true
 	}
-	fmt.Println("Settings loaded successfully")
+	a.logf("Settings loaded successfully\n")
 }
 
-// saveSettings saves settings to file
 func (a *App) saveSettings() error {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
 		return fmt.Errorf("failed to get config directory: %v", err)
 	}
 	
-	// Create snaplog directory if it doesn't exist
 	snaplogDir := filepath.Join(configDir, "snaplog")
 	if err := os.MkdirAll(snaplogDir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %v", err)
@@ -1370,6 +1058,6 @@ func (a *App) saveSettings() error {
 		return fmt.Errorf("failed to write settings file: %v", err)
 	}
 	
-	fmt.Println("Settings saved successfully")
+	a.logf("Settings saved successfully\n")
 	return nil
 }
