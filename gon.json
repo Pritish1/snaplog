@@ -1,0 +1,17 @@
+{
+  "source": ["./build/bin/snaplog.app"],
+  "bundle_id": "io.pritish.snaplog",
+  "api_key": {
+    "key_id": "$NOTARY_KEY_ID",
+    "issuer_id": "$NOTARY_ISSUER_ID",
+    "key_filepath": "$NOTARY_P8_PATH"
+  },
+  "sign": {
+    "application_identity": "Developer ID Application: Pritish Narendra Thombare (39B7GLKL6D)",
+    "entitlements_file": "assets/darwin/entitlements.plist",
+    "hardened_runtime": true,
+    "skip_validation": true
+  },
+  "staple": true
+}
+

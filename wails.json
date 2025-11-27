@@ -16,8 +16,8 @@
       "darwin": {
         "icon": "assets/icons/appicon.png",
         "bundle": "io.pritish.snaplog",
-        "entitlements": "build/darwin/entitlements.plist",
-        "developerid": "Developer ID Application: Pritish (TEAM_ID)",
+        "entitlements": "assets/darwin/entitlements.plist",
+        "developerid": "Developer ID Application: Pritish Narendra Thombare (39B7GLKL6D)",
         "notarize": {
           "file": "snaplog.app",
           "keyid": "$NOTARY_KEY_ID",
