@@ -16,14 +16,21 @@
       "darwin": {
         "icon": "assets/icons/appicon.png",
         "bundle": "io.pritish.snaplog",
-        "entitlements": "build/darwin/entitlements.plist"
+        "entitlements": "build/darwin/entitlements.plist",
+        "developerid": "Developer ID Application: Pritish (TEAM_ID)",
+        "notarize": {
+          "file": "snaplog.app",
+          "keyid": "$NOTARY_KEY_ID",
+          "issuer": "$NOTARY_ISSUER_ID",
+          "key": "$NOTARY_P8_PATH"
+        }
       },
       "linux": {
         "icon": "assets/icons/appicon.png"
       },
       "windows": {
         "icon": "assets/icons/icon.ico"
-      }
+      } 
     }
   }
 }
