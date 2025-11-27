@@ -76,11 +76,67 @@ function App() {
         // Add global event listener
         document.addEventListener('keydown', handleGlobalKeyDown);
 
+        // Focus textarea when window gains focus (e.g., when hotkey is pressed)
+        const handleWindowFocus = () => {
+            if (!showSettings && !deleteConfirmId && !editingEntryId) {
+                // Small delay to ensure the textarea is rendered
+                setTimeout(() => {
+                    const textInput = document.getElementById('textInput');
+                    if (textInput) {
+                        textInput.focus();
+                    }
+                }, 100);
+            }
+        };
+
+        window.addEventListener('focus', handleWindowFocus);
+
         // Cleanup
         return () => {
             document.removeEventListener('keydown', handleGlobalKeyDown);
+            window.removeEventListener('focus', handleWindowFocus);
         };
-    }, [showSettings]);
+    }, [showSettings, deleteConfirmId, editingEntryId]);
+
+    // Focus textarea when component mounts or window becomes visible
+    useEffect(() => {
+        // Initial focus on mount
+        const initialTimer = setTimeout(() => {
+            const textInput = document.getElementById('textInput');
+            if (textInput && !showSettings && !deleteConfirmId && !editingEntryId) {
+                textInput.focus();
+            }
+        }, 200);
+        
+        return () => clearTimeout(initialTimer);
+    }, []); // Run only on mount
+
+    // Focus textarea when window becomes visible (not in settings or delete confirmation)
+    useEffect(() => {
+        if (!showSettings && !deleteConfirmId && !editingEntryId) {
+            // Small delay to ensure the textarea is rendered
+            const timer = setTimeout(() => {
+                const textInput = document.getElementById('textInput');
+                if (textInput) {
+                    textInput.focus();
+                }
+            }, 150);
+            return () => clearTimeout(timer);
+        }
+    }, [showSettings, deleteConfirmId, editingEntryId]);
+
+    // Also focus when edit mode ends
+    useEffect(() => {
+        if (!editingEntryId && !showSettings && !deleteConfirmId) {
+            const timer = setTimeout(() => {
+                const textInput = document.getElementById('textInput');
+                if (textInput) {
+                    textInput.focus();
+                }
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [editingEntryId, showSettings, deleteConfirmId]);
 
     const handleTextChange = (e) => setText(e.target.value);
 
@@ -99,11 +155,13 @@ function App() {
 
         // Check for recognized slash commands
         const trimmedText = text.trim();
-        const recognizedCommands = ['/dash', '/settings'];
+        const recognizedCommands = ['/dash', '/settings', '/editprev', '/delprev'];
         
         if (trimmedText.startsWith('/') && recognizedCommands.includes(trimmedText)) {
             try {
                 await ProcessCommand(trimmedText);
+                // If ProcessCommand succeeds, it shouldn't happen for editprev/delprev
+                // They should return errors with special format
                 setText(''); // Clear the input
                 // Don't hide window for settings command
                 if (trimmedText !== '/settings') {
@@ -113,7 +171,42 @@ function App() {
                 }
                 return;
             } catch (error) {
-                console.error('Error processing command:', error);
+                // ProcessCommand returns an error, but we use it to pass data for editprev/delprev
+                const errorMsg = error?.message || error?.toString() || '';
+                
+                if (errorMsg.startsWith('EDIT_MODE:')) {
+                    // Parse EDIT_MODE:<id>:<content>
+                    const parts = errorMsg.split(':');
+                    if (parts.length >= 3) {
+                        const entryId = parseInt(parts[1]);
+                        const content = parts.slice(2).join(':'); // Rejoin in case content has colons
+                        setEditingEntryId(entryId);
+                        setText(content);
+                        // Don't hide window, allow editing
+                        return;
+                    }
+                } else if (errorMsg.startsWith('DELETE_CONFIRM:')) {
+                    // Parse DELETE_CONFIRM:<id>:<preview>
+                    const parts = errorMsg.split(':');
+                    if (parts.length >= 3) {
+                        const entryId = parseInt(parts[1]);
+                        const preview = parts.slice(2).join(':'); // Rejoin in case preview has colons
+                        setDeleteConfirmId(entryId);
+                        setDeleteConfirmPreview(preview);
+                        setText(''); // Clear the input
+                        // Don't hide window, show confirmation
+                        return;
+                    }
+                } else {
+                    // Actual error or other command
+                    console.error('Error processing command:', errorMsg);
+                    setText('');
+                    if (trimmedText !== '/settings') {
+                        setTimeout(() => {
+                            HideWindow();
+                        }, 100);
+                    }
+                }
                 return;
             }
         }
@@ -173,11 +266,7 @@ function App() {
                 await UpdateEntry(editingEntryId, text);
                 setText(''); // Clear the input
                 setEditingEntryId(null); // Exit edit mode
-                
-                // Hide the window after successful update
-                setTimeout(() => {
-                    HideWindow();
-                }, 100);
+                // Don't hide window - let user continue working
             } catch (error) {
                 console.error('Error updating entry:', error);
                 // Show error but stay in edit mode
@@ -326,7 +415,7 @@ function App() {
             setDeleteConfirmId(null);
             setDeleteConfirmPreview('');
             setText('');
-            // Keep window open after successful delete
+            // Keep window open after successful delete - don't minimize
         } catch (error) {
             console.error('Error deleting entry:', error);
             // Show error but keep confirmation open
@@ -337,9 +426,7 @@ function App() {
         setDeleteConfirmId(null);
         setDeleteConfirmPreview('');
         setText('');
-        setTimeout(() => {
-            HideWindow();
-        }, 100);
+        // Don't hide window on cancel - let user continue working
     };
 
     return (
@@ -580,6 +667,18 @@ function App() {
                                     </div>
                                     <div className="instruction-item">
                                         <code>/settings</code> - Open settings window
+                                    </div>
+                                    <div className="instruction-item">
+                                        <code>/edit &lt;id&gt;</code> - Edit an entry by ID
+                                    </div>
+                                    <div className="instruction-item">
+                                        <code>/editprev</code> - Edit the previous (most recent) entry
+                                    </div>
+                                    <div className="instruction-item">
+                                        <code>/delete &lt;id&gt;</code> - Delete an entry by ID
+                                    </div>
+                                    <div className="instruction-item">
+                                        <code>/delprev</code> - Delete the previous (most recent) entry
                                     </div>
                                 </div>
                             </div>

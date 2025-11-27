@@ -175,6 +175,28 @@
             background: #7f8c8d;
         }
         
+        .copy-all-section {
+            margin-left: auto;
+        }
+        
+        .copy-all-btn {
+            background: transparent;
+            color: #7f8c8d;
+            border: 1px solid #dee2e6;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: normal;
+        }
+        
+        .copy-all-btn:hover {
+            background: #f8f9fa;
+            color: #495057;
+            border-color: #adb5bd;
+        }
+        
         .quick-filters {
             display: flex;
             gap: 8px;
@@ -350,7 +372,7 @@
         
         .entry {
             display: flex;
-            align-items: flex-start;
+            align-items: baseline;
             gap: 12px;
             padding: 8px 12px;
             border-radius: 6px;
@@ -385,8 +407,8 @@
             font-size: 0.8rem;
             font-weight: 500;
             white-space: nowrap;
-            margin-top: 2px;
             min-width: 50px;
+            flex-shrink: 0;
         }
         
         .entry-content-wrapper {
@@ -401,6 +423,23 @@
             overflow-wrap: break-word;
             word-break: break-word;
             overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .entry-content > *:first-child {
+            margin-top: 0;
+            padding-top: 0;
+        }
+        
+        .entry-content p:first-child,
+        .entry-content h1:first-child,
+        .entry-content h2:first-child,
+        .entry-content h3:first-child,
+        .entry-content h4:first-child,
+        .entry-content h5:first-child,
+        .entry-content h6:first-child {
+            margin-top: 0;
         }
         
         .entry-actions {
@@ -475,6 +514,10 @@
         
         .entry-content p {
             margin: 0.5em 0;
+        }
+        
+        .entry-content p:first-child {
+            margin-top: 0;
         }
         
         .entry-content ul, .entry-content ol {
@@ -866,6 +909,9 @@
                 <button class="quick-filter-btn" onclick="setQuickFilter('pastWeek', event)">Past Week</button>
                 <button class="quick-filter-btn" onclick="setQuickFilter('month', event)">This Month</button>
             </div>
+            <div class="copy-all-section">
+                <button class="copy-all-btn" onclick="copyAllFilteredEntries()" title="Copy all currently filtered entries">📋 Copy All Filtered</button>
+            </div>
         </div>
 
         <div id="date-error" class="error-banner"></div>
@@ -978,6 +1024,9 @@
         // Selected tags for filtering
         let selectedTags = [];
         
+        // Store currently displayed (filtered) day groups
+        let currentFilteredDayGroups = [];
+        
         function showDateError(message) {
             const banner = document.getElementById('date-error');
             if (!banner) return;
@@ -992,15 +1041,17 @@
             banner.classList.remove('show');
         }
 
-        function filterByDate() {
+        function applyFilters() {
             const startDate = document.getElementById('start-date').value;
             const endDate = document.getElementById('end-date').value;
             
             console.log('Filtering by date range:', startDate, 'to', endDate);
+            console.log('Selected tags:', selectedTags);
             console.log('Available entries:', originalData.dayGroups.map(dg => ({ date: dg.date, count: dg.count })));
             
             hideDateError();
 
+            // If no filters are active, clear and show all
             if (!startDate && !endDate && selectedTags.length === 0) {
                 clearFilter();
                 return;
@@ -1019,22 +1070,42 @@
             let filteredCount = 0;
             let filteredDays = 0;
             
-            // Filter day groups by date
-            const dateFilteredDayGroups = [];
+            // Apply both date and tag filters together
+            const filteredDayGroups = [];
             originalData.dayGroups.forEach(dayGroup => {
                 const dayDate = new Date(dayGroup.date);
                 console.log('Checking day:', dayGroup.date, 'against range:', start, 'to', end);
+                
+                // First filter by date at the day level
                 if (dayDate < start || dayDate > end) {
-                    return;
+                    return; // Skip this day group if it's outside the date range
                 }
 
+                // Filter entries by both date and tags
                 const filteredEntries = dayGroup.entries.filter(entry => {
+                    // Check date filter
                     const entryDate = new Date(entry.date);
-                    return entryDate >= start && entryDate <= end;
+                    const dateMatch = entryDate >= start && entryDate <= end;
+                    
+                    if (!dateMatch) {
+                        return false;
+                    }
+                    
+                    // Check tag filter if tags are selected
+                    if (selectedTags.length > 0) {
+                        const tagMatch = selectedTags.every(tag => {
+                            // Check both rawContent and content for tags
+                            const content = entry.rawContent || entry.content || '';
+                            return content.includes(`#${tag}`);
+                        });
+                        return tagMatch;
+                    }
+                    
+                    return true; // No tag filter, so include if date matches
                 });
 
                 if (filteredEntries.length > 0) {
-                    dateFilteredDayGroups.push({
+                    filteredDayGroups.push({
                         dayName: dayGroup.dayName,
                         date: dayGroup.date,
                         count: filteredEntries.length,
@@ -1042,24 +1113,6 @@
                     });
                 }
             });
-             
-            // Apply tag filter if tags are selected
-            const filteredDayGroups = dateFilteredDayGroups.map(dayGroup => {
-                if (selectedTags.length === 0) {
-                    return dayGroup;
-                }
-
-                const tagFilteredEntries = dayGroup.entries.filter(entry => {
-                    return selectedTags.every(tag => entry.content.includes(`#${tag}`));
-                });
-
-                return {
-                    dayName: dayGroup.dayName,
-                    date: dayGroup.date,
-                    entries: tagFilteredEntries,
-                    count: tagFilteredEntries.length
-                };
-            }).filter(dayGroup => dayGroup.count > 0);
             
             filteredCount = filteredDayGroups.reduce((sum, dg) => sum + dg.count, 0);
             filteredDays = filteredDayGroups.length;
@@ -1076,8 +1129,21 @@
             if (selectedTags.length > 0) {
                 filterText += ` with tags: ${selectedTags.map(t => `#${t}`).join(', ')}`;
             }
+            if (startDate || endDate) {
+                const dateRange = startDate && endDate 
+                    ? `${startDate} to ${endDate}`
+                    : startDate 
+                    ? `from ${startDate}`
+                    : `until ${endDate}`;
+                filterText += ` (${dateRange})`;
+            }
             filterDetails.textContent = filterText;
             filterInfo.style.display = 'block';
+        }
+        
+        // Keep filterByDate for backward compatibility, but make it call applyFilters
+        function filterByDate() {
+            applyFilters();
         }
         
         function setQuickFilter(type, evt) {
@@ -1155,6 +1221,8 @@
             
             // Restore original display
             updateDisplay(originalData.dayGroups, originalData.totalEntries, originalData.totalDays);
+            // Update current filtered groups to all original data
+            currentFilteredDayGroups = originalData.dayGroups;
         }
         
         function addTag() {
@@ -1189,42 +1257,15 @@
             });
         }
         
+        // Keep filterByTags for backward compatibility, but make it call applyFilters
         function filterByTags() {
-            if (selectedTags.length === 0) {
-                filterByDate();
-                return;
-            }
-            
-            // Filter entries that contain ALL selected tags
-            const filteredDayGroups = originalData.dayGroups.map(dayGroup => {
-                const filteredEntries = dayGroup.entries.filter(entry => {
-                    // Check if entry contains all selected tags
-                    return selectedTags.every(tag => {
-                        return entry.content.includes(`#${tag}`);
-                    });
-                });
-
-                return {
-                    dayName: dayGroup.dayName,
-                    date: dayGroup.date,
-                    entries: filteredEntries,
-                    count: filteredEntries.length
-                };
-            }).filter(dayGroup => dayGroup.count > 0);
-            
-            const filteredCount = filteredDayGroups.reduce((sum, dg) => sum + dg.count, 0);
-            const filteredDays = filteredDayGroups.length;
-            
-            updateDisplay(filteredDayGroups, filteredCount, filteredDays);
-            
-            // Show filter info
-            const filterInfo = document.getElementById('filter-info');
-            const filterDetails = document.getElementById('filter-details');
-            filterDetails.textContent = `${filteredCount} entries from ${filteredDays} days with tags: ${selectedTags.map(t => `#${t}`).join(', ')}`;
-            filterInfo.style.display = 'block';
+            applyFilters();
         }
         
         function updateDisplay(dayGroups, totalCount, totalDays) {
+            // Store the currently displayed day groups for copying
+            currentFilteredDayGroups = dayGroups;
+            
             // Update stats
             document.getElementById('total-entries').textContent = originalData.totalEntries;
             document.getElementById('total-days').textContent = originalData.totalDays;
@@ -1404,29 +1445,37 @@
                 event.stopPropagation();
             }
             
-            // Find all entries for this day
-            const dayGroup = document.querySelector(`.day-group[data-date="${dateKey}"]`);
-            if (!dayGroup) {
-                console.error('Day group not found:', dateKey);
+            // Find the day group in the original data to get all entries for this day
+            const dayGroupData = originalData.dayGroups.find(dg => dg.date === dateKey);
+            if (!dayGroupData) {
+                console.error('Day group not found in data:', dateKey);
                 return;
             }
             
-            const entries = dayGroup.querySelectorAll('.entry');
-            if (entries.length === 0) {
+            if (dayGroupData.entries.length === 0) {
                 console.error('No entries found for day:', dateKey);
                 return;
             }
             
-            // Collect all entry texts with timestamps
-            let dayText = '';
-            entries.forEach(entry => {
-                const timeElement = entry.querySelector('.entry-time');
-                const contentElement = entry.querySelector('.entry-content');
-                if (timeElement && contentElement) {
-                    const time = timeElement.textContent.trim();
-                    const content = contentElement.textContent || contentElement.innerText;
-                    dayText += `[${time}] ${content}\n\n`;
+            // Format day header
+            const dayName = dayGroupData.dayName || '';
+            const date = dayGroupData.date || dateKey;
+            let dayText = `${dayName}, ${date}\n`;
+            
+            // Collect all entry texts with timestamps (compact format, no extra whitespace between entries)
+            dayGroupData.entries.forEach(entry => {
+                const time = entry.localTime || '';
+                // Use rawContent if available, otherwise use content (which might be HTML)
+                const content = entry.rawContent || entry.content || '';
+                // If content is HTML, extract text content
+                let textContent = content;
+                if (content.includes('<')) {
+                    // Create a temporary element to extract text from HTML
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = content;
+                    textContent = tempDiv.textContent || tempDiv.innerText || '';
                 }
+                dayText += `[${time}] ${textContent}\n`;
             });
             
             // Copy to clipboard
@@ -1437,6 +1486,67 @@
                 // Fallback for older browsers
                 const textArea = document.createElement('textarea');
                 textArea.value = dayText.trim();
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showCopyFeedback();
+            });
+        }
+        
+        function copyAllFilteredEntries() {
+            // Use the currently displayed (filtered) day groups
+            let dayGroupsToCopy = currentFilteredDayGroups;
+            if (dayGroupsToCopy.length === 0) {
+                // If no filtered groups, use all original data
+                dayGroupsToCopy = originalData.dayGroups;
+            }
+            
+            if (dayGroupsToCopy.length === 0) {
+                console.error('No entries to copy');
+                return;
+            }
+            
+            let allText = '';
+            
+            // Format each day group
+            dayGroupsToCopy.forEach((dayGroup, index) => {
+                const dayName = dayGroup.dayName || '';
+                const date = dayGroup.date || '';
+                
+                // Add day header
+                allText += `${dayName}, ${date}\n`;
+                
+                // Add all entries for this day (compact, no extra whitespace between entries)
+                dayGroup.entries.forEach(entry => {
+                    const time = entry.localTime || '';
+                    // Use rawContent if available, otherwise use content
+                    const content = entry.rawContent || entry.content || '';
+                    // If content is HTML, extract text content
+                    let textContent = content;
+                    if (content.includes('<')) {
+                        // Create a temporary element to extract text from HTML
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = content;
+                        textContent = tempDiv.textContent || tempDiv.innerText || '';
+                    }
+                    allText += `[${time}] ${textContent}\n`;
+                });
+                
+                // Add spacing between days (but not after the last day)
+                if (index < dayGroupsToCopy.length - 1) {
+                    allText += '\n';
+                }
+            });
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(allText.trim()).then(() => {
+                showCopyFeedback();
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = allText.trim();
                 document.body.appendChild(textArea);
                 textArea.select();
                 document.execCommand('copy');
@@ -1521,6 +1631,9 @@
                 count: dg.count,
                 entryDates: dg.entries.map(e => e.date)
             })));
+            
+            // Initialize current filtered day groups with all original data
+            currentFilteredDayGroups = originalData.dayGroups;
             
             // Format all day dates for display
             document.querySelectorAll('.day-date[data-iso-date]').forEach(element => {

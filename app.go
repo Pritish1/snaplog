@@ -100,6 +100,7 @@ type App struct {
 	packageHotkey *hotkey.Hotkey
 	settings     *Settings
 	db           *sql.DB
+	logFile      *os.File
 }
 
 // NewApp creates a new App application struct
@@ -120,18 +121,23 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.hotkeyId = uintptr(1) // Initialize hotkey ID
 	
+	// Initialize logging
+	if err := a.initLogging(); err != nil {
+		fmt.Printf("Warning: Failed to initialize logging: %v\n", err)
+	}
+	
 	// Load settings from file
 	a.loadSettings()
 	
 	// Initialize database
 	if err := a.initDatabase(); err != nil {
-		fmt.Printf("Failed to initialize database: %v\n", err)
+		a.logf("Failed to initialize database: %v\n", err)
 		return
 	}
 	
 	// Check if this is the first run
 	if a.settings.FirstRun {
-		fmt.Println("First run detected - showing setup window")
+		a.logf("First run detected - showing setup window\n")
 		// Show window for first-time setup and emit event to open settings
 		go func() {
 			time.Sleep(500 * time.Millisecond) // Wait for window to be ready
@@ -147,16 +153,69 @@ func (a *App) startup(ctx context.Context) {
 
 // shutdown is called when the app is shutting down
 func (a *App) shutdown(ctx context.Context) {
-	fmt.Println("Shutting down SnapLog...")
+	a.logf("Shutting down SnapLog...\n")
 	// Stop hotkey detection if running
 	a.stopHotkeyDetection()
 	
 	// Close database connection
 	if a.db != nil {
 		a.db.Close()
-		fmt.Println("Database connection closed")
+		a.logf("Database connection closed\n")
+	}
+	
+	// Close log file
+	if a.logFile != nil {
+		a.logFile.Close()
+		a.logFile = nil
 	}
 }
+
+// initLogging initializes file-based logging
+func (a *App) initLogging() error {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return fmt.Errorf("failed to get config directory: %v", err)
+	}
+	
+	snaplogDir := filepath.Join(configDir, "snaplog")
+	if err := os.MkdirAll(snaplogDir, 0755); err != nil {
+		return fmt.Errorf("failed to create snaplog directory: %v", err)
+	}
+	
+	// Create log file with date in name (one per day)
+	logFileName := fmt.Sprintf("snaplog-%s.log", time.Now().Format("2006-01-02"))
+	logFilePath := filepath.Join(snaplogDir, logFileName)
+	
+	// Open log file in append mode
+	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %v", err)
+	}
+	
+	a.logFile = logFile
+	
+	// Also write to stdout for development
+	fmt.Printf("Logging to: %s\n", logFilePath)
+	
+	return nil
+}
+
+// logf writes a formatted message to both log file and stdout
+func (a *App) logf(format string, args ...interface{}) {
+	message := fmt.Sprintf(format, args...)
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	logMessage := fmt.Sprintf("[%s] %s", timestamp, message)
+	
+	// Write to log file
+	if a.logFile != nil {
+		a.logFile.WriteString(logMessage)
+		a.logFile.Sync() // Ensure it's written immediately
+	}
+	
+	// Also write to stdout
+	fmt.Print(logMessage)
+}
+
 
 // initDatabase initializes the SQLite database
 func (a *App) initDatabase() error {
@@ -331,8 +390,34 @@ func (a *App) ProcessCommand(command string) error {
 	case "/settings":
 		a.OpenSettings()
 		return nil
+	case "/editprev":
+		// Get the most recent entry
+		entry, err := a.GetMostRecentEntry()
+		if err != nil {
+			return err
+		}
+		
+		// Return special error format that frontend can parse
+		// Format: EDIT_MODE:<id>:<content>
+		return fmt.Errorf("EDIT_MODE:%d:%s", entry.ID, entry.Content)
+	case "/delprev":
+		// Get the most recent entry
+		entry, err := a.GetMostRecentEntry()
+		if err != nil {
+			return err
+		}
+		
+		// Get entry preview for confirmation
+		preview := entry.Content
+		if len(preview) > 100 {
+			preview = preview[:100] + "..."
+		}
+		
+		// Return special error format for confirmation
+		// Format: DELETE_CONFIRM:<id>:<preview>
+		return fmt.Errorf("DELETE_CONFIRM:%d:%s", entry.ID, preview)
 	default:
-		return fmt.Errorf("unknown command: %s. Available commands: /dash, /settings, /edit <id>, /delete <id>", command)
+		return fmt.Errorf("unknown command: %s. Available commands: /dash, /settings, /edit <id>, /delete <id>, /editprev, /delprev", command)
 	}
 }
 
@@ -800,6 +885,25 @@ func (a *App) GetEntryByID(id int) (*LogEntry, error) {
 	err := a.db.QueryRow(query, id).Scan(&entry.ID, &entry.Content, &entry.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("entry not found: %v", err)
+	}
+
+	return &entry, nil
+}
+
+// GetMostRecentEntry retrieves the most recent log entry
+func (a *App) GetMostRecentEntry() (*LogEntry, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+
+	var entry LogEntry
+	query := `SELECT id, content, created_at FROM log_entries ORDER BY created_at DESC LIMIT 1`
+	err := a.db.QueryRow(query).Scan(&entry.ID, &entry.Content, &entry.CreatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("no entries found")
+		}
+		return nil, fmt.Errorf("failed to get most recent entry: %v", err)
 	}
 
 	return &entry, nil

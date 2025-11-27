@@ -26,6 +26,8 @@ export function GetLogEntries(arg1:number):Promise<Array<main.LogEntry>>;
 
 export function GetLogEntriesCount():Promise<number>;
 
+export function GetMostRecentEntry():Promise<main.LogEntry>;
+
 export function GetSettings():Promise<main.Settings>;
 
 export function GetTags():Promise<Array<main.Tag>>;

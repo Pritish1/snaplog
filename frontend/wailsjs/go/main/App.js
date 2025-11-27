@@ -50,6 +50,10 @@ export function GetLogEntriesCount() {
   return window['go']['main']['App']['GetLogEntriesCount']();
 }
 
+export function GetMostRecentEntry() {
+  return window['go']['main']['App']['GetMostRecentEntry']();
+}
+
 export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
 }
