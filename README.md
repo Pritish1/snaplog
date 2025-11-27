@@ -30,10 +30,6 @@ wails dev
 ### Build
 
 ```bash
-# macOS
-bash ./build-macos.sh
-
-# Other platforms
 wails build
 ```
 

@@ -14,7 +14,9 @@
     "cgo": false,
     "platforms": {
       "darwin": {
-        "icon": "assets/icons/appicon.png"
+        "icon": "assets/icons/appicon.png",
+        "bundle": "io.pritish.snaplog",
+        "entitlements": "build/darwin/entitlements.plist"
       },
       "linux": {
         "icon": "assets/icons/appicon.png"
