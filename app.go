@@ -9,11 +9,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -81,6 +83,8 @@ type App struct {
 	settings     *Settings
 	db           *sql.DB
 	logFile      *os.File
+	httpServer   *http.Server
+	dashboardPort int
 }
 
 // NewApp creates a new App application struct
@@ -92,6 +96,7 @@ func NewApp() *App {
 			FirstRun:        true,
 			Theme:           "dark",
 		},
+		dashboardPort: 37564, // Rarely used port
 	}
 }
 
@@ -110,6 +115,9 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	
+	// Start HTTP server for dashboard
+	go a.startDashboardServer()
+	
 	if a.settings.FirstRun {
 		a.logf("First run detected - showing setup window\n")
 		go func() {
@@ -125,6 +133,14 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) shutdown(ctx context.Context) {
 	a.logf("Shutting down SnapLog...\n")
 	a.stopHotkeyDetection()
+	
+	// Shutdown HTTP server
+	if a.httpServer != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		a.httpServer.Shutdown(shutdownCtx)
+		a.logf("Dashboard server stopped\n")
+	}
 	
 	if a.db != nil {
 		a.db.Close()
@@ -448,23 +464,15 @@ func (a *App) ClearAllData() error {
 }
 
 func (a *App) generateDashboard() error {
-	a.logf("Starting dashboard generation...\n")
+	a.logf("Opening dashboard...\n")
 	
-	data, err := a.getDashboardData()
-	if err != nil {
-		return fmt.Errorf("failed to get dashboard data: %v", err)
+	dashboardURL := fmt.Sprintf("http://localhost:%d/dash", a.dashboardPort)
+	
+	if err := a.openInBrowser(dashboardURL); err != nil {
+		return fmt.Errorf("failed to open dashboard: %v", err)
 	}
 
-	htmlContent, err := a.generateHTMLFromTemplate(data)
-	if err != nil {
-		return fmt.Errorf("failed to generate HTML from template: %v", err)
-	}
-
-	if err := a.saveAndOpenDashboard(htmlContent); err != nil {
-		return fmt.Errorf("failed to save and open dashboard: %v", err)
-	}
-
-	a.logf("Dashboard generated and opened successfully\n")
+	a.logf("Dashboard opened at %s\n", dashboardURL)
 	return nil
 }
 
@@ -636,23 +644,76 @@ func (a *App) generateHTMLFromTemplate(data *DisplayDashboardData) (string, erro
 	return buf.String(), nil
 }
 
-func (a *App) saveAndOpenDashboard(htmlContent string) error {
-	tempPath, err := a.getTempPath()
+// startDashboardServer starts the HTTP server for serving the dashboard
+func (a *App) startDashboardServer() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/dash", a.serveDashboard)
+	mux.HandleFunc("/api/entries/", a.handleEntryAPI)
+	
+	server := &http.Server{
+		Addr:    fmt.Sprintf("localhost:%d", a.dashboardPort),
+		Handler: mux,
+	}
+	
+	a.httpServer = server
+	
+	a.logf("Dashboard server starting on http://localhost:%d/dash\n", a.dashboardPort)
+	
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		a.logf("Failed to start dashboard server: %v\n", err)
+	}
+}
+
+// handleEntryAPI handles API requests for entries (DELETE)
+func (a *App) handleEntryAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	// Extract entry ID from path: /api/entries/123
+	path := strings.TrimPrefix(r.URL.Path, "/api/entries/")
+	entryID, err := strconv.Atoi(path)
 	if err != nil {
-		return fmt.Errorf("failed to get temp path: %v", err)
+		http.Error(w, "Invalid entry ID", http.StatusBadRequest)
+		return
 	}
 	
-	htmlFile := filepath.Join(tempPath, "snaplog-dashboard.html")
-	if err := os.WriteFile(htmlFile, []byte(htmlContent), 0644); err != nil {
-		return fmt.Errorf("failed to write HTML file: %v", err)
+	// Delete the entry
+	if err := a.DeleteEntry(entryID); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to delete entry: %v", err), http.StatusInternalServerError)
+		a.logf("Error deleting entry %d: %v\n", entryID, err)
+		return
 	}
 	
-	if err := a.openInBrowser(htmlFile); err != nil {
-		return fmt.Errorf("failed to open browser: %v", err)
-	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Entry deleted successfully",
+	})
 	
-	a.logf("Dashboard generated: %s\n", htmlFile)
-	return nil
+	a.logf("Entry %d deleted via dashboard\n", entryID)
+}
+
+// serveDashboard generates and serves the dashboard HTML
+func (a *App) serveDashboard(w http.ResponseWriter, r *http.Request) {
+	data, err := a.getDashboardData()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get dashboard data: %v", err), http.StatusInternalServerError)
+		a.logf("Error getting dashboard data: %v\n", err)
+		return
+	}
+
+	htmlContent, err := a.generateHTMLFromTemplate(data)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to generate HTML: %v", err), http.StatusInternalServerError)
+		a.logf("Error generating HTML: %v\n", err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(htmlContent))
 }
 
 func (a *App) getTempPath() (string, error) {
@@ -669,16 +730,16 @@ func (a *App) getTempPath() (string, error) {
 	return snaplogTempDir, nil
 }
 
-func (a *App) openInBrowser(filePath string) error {
+func (a *App) openInBrowser(urlOrPath string) error {
 	var cmd *exec.Cmd
 	
 	switch runtime.GOOS {
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", "", filePath)
+		cmd = exec.Command("cmd", "/c", "start", "", urlOrPath)
 	case "darwin":
-		cmd = exec.Command("open", filePath)
+		cmd = exec.Command("open", urlOrPath)
 	case "linux":
-		cmd = exec.Command("xdg-open", filePath)
+		cmd = exec.Command("xdg-open", urlOrPath)
 	default:
 		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
 	}
