@@ -6,6 +6,21 @@ This document lists all the secrets that need to be configured in your GitHub re
 
 These secrets are required for signing and notarizing the macOS app:
 
+### `DEVELOPER_ID_CERT`
+- **Description**: Your Developer ID certificate in base64-encoded `.p12` format
+- **How to get it**: 
+  1. Export your Developer ID certificate from Keychain Access on macOS
+  2. Select the certificate → Right-click → Export
+  3. Choose `.p12` format and set a password
+  4. Convert to base64: `base64 -i certificate.p12 | pbcopy` (macOS) or `certutil -encode certificate.p12 certificate.txt` (Windows)
+  5. Copy the base64 content (without BEGIN/END markers if using certutil)
+- **Example**: Base64-encoded string of your .p12 file
+
+### `DEVELOPER_ID_CERT_PASSWORD`
+- **Description**: The password you set when exporting the `.p12` certificate
+- **How to get it**: The password you entered when exporting the certificate from Keychain Access
+- **Example**: `your-certificate-password`
+
 ### `NOTARY_KEY_ID`
 - **Description**: Your Apple Notary Service API Key ID
 - **How to get it**: 

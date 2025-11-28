@@ -32,10 +32,12 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       - name: Install frontend dependencies
-        run: npm --prefix frontend install
+        working-directory: frontend
+        run: npm install
 
       - name: Build frontend
-        run: npm --prefix frontend run build
+        working-directory: frontend
+        run: npm run build
 
       - name: Build Windows app
         run: wails build -platform windows/amd64
@@ -68,13 +70,28 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       - name: Install frontend dependencies
-        run: npm --prefix frontend install
+        working-directory: frontend
+        run: npm install
 
       - name: Build frontend
-        run: npm --prefix frontend run build
+        working-directory: frontend
+        run: npm run build
 
       - name: Build macOS app
         run: wails build -platform darwin/amd64
+
+      - name: Import Developer ID certificate
+        env:
+          DEVELOPER_ID_CERT: ${{ secrets.DEVELOPER_ID_CERT }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          echo "$DEVELOPER_ID_CERT" | base64 --decode > developer_id.p12
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import developer_id.p12 -k build.keychain -P "$DEVELOPER_ID_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
+          rm developer_id.p12
 
       - name: Sign app with codesign
         run: |
@@ -82,6 +99,7 @@ jobs:
             --entitlements assets/darwin/entitlements.plist \
             --options runtime \
             --timestamp \
+            --keychain build.keychain \
             build/bin/snaplog.app
 
       - name: Verify code signature
@@ -109,6 +127,11 @@ jobs:
       - name: Clean up notary key
         if: always()
         run: rm -f notary_key.p8
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain build.keychain || true
 
       - name: Create DMG
         run: |
