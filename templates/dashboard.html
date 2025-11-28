@@ -1057,8 +1057,12 @@
                 return;
             }
             
-            const start = startDate ? new Date(startDate) : new Date('1900-01-01');
-            const end = endDate ? new Date(endDate) : new Date('2100-12-31');
+            const start = startDate ? parseLocalDate(startDate) : new Date('1900-01-01');
+            const end = endDate ? parseLocalDate(endDate) : new Date('2100-12-31');
+            // Set end date to end of day (23:59:59.999) for inclusive comparison
+            if (endDate) {
+                end.setHours(23, 59, 59, 999);
+            }
 
             if (startDate && endDate && start > end) {
                 showDateError('Start date must be earlier than the end date.');
@@ -1073,7 +1077,7 @@
             // Apply both date and tag filters together
             const filteredDayGroups = [];
             originalData.dayGroups.forEach(dayGroup => {
-                const dayDate = new Date(dayGroup.date);
+                const dayDate = parseLocalDate(dayGroup.date);
                 console.log('Checking day:', dayGroup.date, 'against range:', start, 'to', end);
                 
                 // First filter by date at the day level
@@ -1083,8 +1087,8 @@
 
                 // Filter entries by both date and tags
                 const filteredEntries = dayGroup.entries.filter(entry => {
-                    // Check date filter
-                    const entryDate = new Date(entry.date);
+                    // Check date filter - entry.date is already in YYYY-MM-DD format
+                    const entryDate = parseLocalDate(entry.date);
                     const dateMatch = entryDate >= start && entryDate <= end;
                     
                     if (!dateMatch) {
@@ -1146,6 +1150,20 @@
             applyFilters();
         }
         
+        // Helper function to format date as YYYY-MM-DD in local time
+        function formatLocalDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Helper function to create date at local midnight from YYYY-MM-DD string
+        function parseLocalDate(dateStr) {
+            const [year, month, day] = dateStr.split('-').map(Number);
+            return new Date(year, month - 1, day, 0, 0, 0, 0);
+        }
+
         function setQuickFilter(type, evt) {
             const today = new Date();
             const startDateInput = document.getElementById('start-date');
@@ -1165,7 +1183,7 @@
             
             switch(type) {
                 case 'today':
-                    const todayStr = today.toISOString().split('T')[0];
+                    const todayStr = formatLocalDate(today);
                     startDateInput.value = todayStr;
                     endDateInput.value = todayStr;
                     console.log('Today filter set to:', todayStr);
@@ -1175,25 +1193,25 @@
                     weekStart.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
                     const weekEnd = new Date(weekStart);
                     weekEnd.setDate(weekStart.getDate() + 6); // End of week (Saturday)
-                    startDateInput.value = weekStart.toISOString().split('T')[0];
-                    endDateInput.value = weekEnd.toISOString().split('T')[0];
-                    console.log('Week filter set to:', weekStart.toISOString().split('T')[0], 'to', weekEnd.toISOString().split('T')[0]);
+                    startDateInput.value = formatLocalDate(weekStart);
+                    endDateInput.value = formatLocalDate(weekEnd);
+                    console.log('Week filter set to:', formatLocalDate(weekStart), 'to', formatLocalDate(weekEnd));
                     break;
                 case 'pastWeek':
                     const pastWeekEnd = new Date(today);
                     pastWeekEnd.setDate(today.getDate() - 1);
                     const pastWeekStart = new Date(pastWeekEnd);
                     pastWeekStart.setDate(pastWeekEnd.getDate() - 6);
-                    startDateInput.value = pastWeekStart.toISOString().split('T')[0];
-                    endDateInput.value = pastWeekEnd.toISOString().split('T')[0];
-                    console.log('Past week filter set to:', pastWeekStart.toISOString().split('T')[0], 'to', pastWeekEnd.toISOString().split('T')[0]);
+                    startDateInput.value = formatLocalDate(pastWeekStart);
+                    endDateInput.value = formatLocalDate(pastWeekEnd);
+                    console.log('Past week filter set to:', formatLocalDate(pastWeekStart), 'to', formatLocalDate(pastWeekEnd));
                     break;
                 case 'month':
                     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
                     const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                    startDateInput.value = monthStart.toISOString().split('T')[0];
-                    endDateInput.value = monthEnd.toISOString().split('T')[0];
-                    console.log('Month filter set to:', monthStart.toISOString().split('T')[0], 'to', monthEnd.toISOString().split('T')[0]);
+                    startDateInput.value = formatLocalDate(monthStart);
+                    endDateInput.value = formatLocalDate(monthEnd);
+                    console.log('Month filter set to:', formatLocalDate(monthStart), 'to', formatLocalDate(monthEnd));
                     break;
             }
             
@@ -1649,8 +1667,8 @@
             const today = new Date();
             const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
             
-            document.getElementById('end-date').value = today.toISOString().split('T')[0];
-            document.getElementById('start-date').value = lastWeek.toISOString().split('T')[0];
+            document.getElementById('end-date').value = formatLocalDate(today);
+            document.getElementById('start-date').value = formatLocalDate(lastWeek);
             
             // Apply initial filter
             filterByDate();
