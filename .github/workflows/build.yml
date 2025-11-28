@@ -113,7 +113,7 @@ jobs:
       - name: Notarize app
         run: |
           xcrun notarytool submit build/bin/snaplog.app \
-            --key-path notary_key.p8 \
+            --key notary_key.p8 \
             --key-id "${{ secrets.NOTARY_KEY_ID }}" \
             --issuer "${{ secrets.NOTARY_ISSUER_ID }}" \
             --wait
