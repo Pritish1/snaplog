@@ -110,9 +110,15 @@ jobs:
           echo "${{ secrets.NOTARY_P8_KEY }}" > notary_key.p8
           chmod 600 notary_key.p8
 
+      - name: Zip app for notarization
+        run: |
+          cd build/bin
+          zip -r snaplog.zip snaplog.app
+          cd ../..
+
       - name: Notarize app
         run: |
-          xcrun notarytool submit build/bin/snaplog.app \
+          xcrun notarytool submit build/bin/snaplog.zip \
             --key notary_key.p8 \
             --key-id "${{ secrets.NOTARY_KEY_ID }}" \
             --issuer "${{ secrets.NOTARY_ISSUER_ID }}" \
@@ -124,9 +130,11 @@ jobs:
       - name: Verify notarization
         run: xcrun stapler validate build/bin/snaplog.app
 
-      - name: Clean up notary key
+      - name: Clean up notary key and zip
         if: always()
-        run: rm -f notary_key.p8
+        run: |
+          rm -f notary_key.p8
+          rm -f build/bin/snaplog.zip
 
       - name: Clean up keychain
         if: always()
