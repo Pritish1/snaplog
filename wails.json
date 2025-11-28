@@ -17,13 +17,7 @@
         "icon": "assets/icons/appicon.png",
         "bundle": "io.pritish.snaplog",
         "entitlements": "assets/darwin/entitlements.plist",
-        "developerid": "Developer ID Application: Pritish Narendra Thombare (39B7GLKL6D)",
-        "notarize": {
-          "file": "snaplog.app",
-          "keyid": "$NOTARY_KEY_ID",
-          "issuer": "$NOTARY_ISSUER_ID",
-          "key": "$NOTARY_P8_PATH"
-        }
+        "developerid": "Developer ID Application: Pritish Narendra Thombare (39B7GLKL6D)"
       },
       "linux": {
         "icon": "assets/icons/appicon.png"

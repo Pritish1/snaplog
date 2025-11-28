@@ -1,0 +1,157 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  VERSION: ${{ github.ref_name == 'refs/heads/main' && 'dev' || github.ref_name }}
+  GO_VERSION: '1.23'
+
+jobs:
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: npm --prefix frontend install
+
+      - name: Build frontend
+        run: npm --prefix frontend run build
+
+      - name: Build Windows app
+        run: wails build -platform windows/amd64
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snaplog-windows-amd64
+          path: build/bin/snaplog.exe
+          retention-days: 30
+
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: npm --prefix frontend install
+
+      - name: Build frontend
+        run: npm --prefix frontend run build
+
+      - name: Build macOS app
+        run: wails build -platform darwin/amd64
+
+      - name: Sign app with codesign
+        run: |
+          codesign --force --deep --sign "Developer ID Application: Pritish Narendra Thombare (39B7GLKL6D)" \
+            --entitlements assets/darwin/entitlements.plist \
+            --options runtime \
+            --timestamp \
+            build/bin/snaplog.app
+
+      - name: Verify code signature
+        run: codesign --verify --verbose build/bin/snaplog.app
+
+      - name: Create notarization key file
+        run: |
+          echo "${{ secrets.NOTARY_P8_KEY }}" > notary_key.p8
+          chmod 600 notary_key.p8
+
+      - name: Notarize app
+        run: |
+          xcrun notarytool submit build/bin/snaplog.app \
+            --key-path notary_key.p8 \
+            --key-id "${{ secrets.NOTARY_KEY_ID }}" \
+            --issuer "${{ secrets.NOTARY_ISSUER_ID }}" \
+            --wait
+
+      - name: Staple notarization
+        run: xcrun stapler staple build/bin/snaplog.app
+
+      - name: Verify notarization
+        run: xcrun stapler validate build/bin/snaplog.app
+
+      - name: Clean up notary key
+        if: always()
+        run: rm -f notary_key.p8
+
+      - name: Create DMG
+        run: |
+          hdiutil create -volname "SnapLog" -srcfolder build/bin/snaplog.app -ov -format UDZO snaplog.dmg
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snaplog-macos-amd64
+          path: |
+            build/bin/snaplog.app
+            snaplog.dmg
+          retention-days: 30
+
+  release:
+    name: Create Release
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: snaplog-windows-amd64
+          path: dist/windows
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: snaplog-macos-amd64
+          path: dist/macos
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/windows/snaplog.exe
+            dist/macos/snaplog.app
+            dist/macos/snaplog.dmg
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

@@ -172,3 +172,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Notarization keys (never commit these!)
+notary_key.p8
+*.p8
