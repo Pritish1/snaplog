@@ -6,16 +6,8 @@ export function ClearAllData() {
   return window['go']['main']['App']['ClearAllData']();
 }
 
-export function ClearDashboardFiles() {
-  return window['go']['main']['App']['ClearDashboardFiles']();
-}
-
 export function DeleteEntry(arg1) {
   return window['go']['main']['App']['DeleteEntry'](arg1);
-}
-
-export function GetDashboardPath() {
-  return window['go']['main']['App']['GetDashboardPath']();
 }
 
 export function GetDatabasePath() {

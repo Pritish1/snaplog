@@ -4,11 +4,7 @@ import {main} from '../models';
 
 export function ClearAllData():Promise<void>;
 
-export function ClearDashboardFiles():Promise<string>;
-
 export function DeleteEntry(arg1:number):Promise<void>;
-
-export function GetDashboardPath():Promise<string>;
 
 export function GetDatabasePath():Promise<string>;
 

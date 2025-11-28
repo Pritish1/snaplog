@@ -1,6 +1,6 @@
 import {useState, useEffect} from 'react';
 import './App.css';
-import {LogText, HideWindow, Quit, GetSettings, SetSettings, RenderMarkdown, ProcessCommand, ClearAllData, GetDatabasePath, GetDashboardPath, ClearDashboardFiles, UpdateEntry, DeleteEntry} from "../wailsjs/go/main/App";
+import {LogText, HideWindow, Quit, GetSettings, SetSettings, RenderMarkdown, ProcessCommand, ClearAllData, GetDatabasePath, UpdateEntry, DeleteEntry} from "../wailsjs/go/main/App";
 import {EventsOn} from "../wailsjs/runtime/runtime";
 
 function App() {
@@ -12,9 +12,6 @@ function App() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteSuccess, setDeleteSuccess] = useState(false);
     const [databasePath, setDatabasePath] = useState('');
-    const [dashboardPath, setDashboardPath] = useState('');
-    const [dashboardCleanupMessage, setDashboardCleanupMessage] = useState('');
-    const [dashboardCleanupStatus, setDashboardCleanupStatus] = useState('success');
     const [editingEntryId, setEditingEntryId] = useState(null);
     const [deleteConfirmId, setDeleteConfirmId] = useState(null);
     const [deleteConfirmPreview, setDeleteConfirmPreview] = useState('');
@@ -38,7 +35,6 @@ function App() {
         
         // Load file paths
         GetDatabasePath().then(setDatabasePath);
-        GetDashboardPath().then(setDashboardPath);
         
         // Listen for open-settings event
         EventsOn("open-settings", () => {
@@ -391,21 +387,6 @@ function App() {
         }
     };
 
-    const handleClearDashboards = async () => {
-        try {
-            const response = await ClearDashboardFiles();
-            setDashboardCleanupStatus('success');
-            setDashboardCleanupMessage(response || 'Dashboard files cleared.');
-        } catch (error) {
-            console.error('Error clearing dashboard files:', error);
-            setDashboardCleanupStatus('error');
-            setDashboardCleanupMessage('Unable to clear dashboard files.');
-        }
-
-        setTimeout(() => {
-            setDashboardCleanupMessage('');
-        }, 4000);
-    };
 
     const handleDeleteConfirm = async () => {
         if (!deleteConfirmId) return;
@@ -586,16 +567,6 @@ function App() {
                                 </div>
                             </div>
 
-                            {/* Dashboard Maintenance */}
-                            <div className="setting-group">
-                                <label>Dashboards</label>
-                                <p className="setting-note">Remove generated dashboard HTML files from the temporary directory. New dashboards will regenerate automatically.</p>
-                                <button className="clear-btn" onClick={handleClearDashboards}>Clear Generated Dashboards</button>
-                                {dashboardCleanupMessage && (
-                                    <p className={`dashboard-feedback ${dashboardCleanupStatus}`}>{dashboardCleanupMessage}</p>
-                                )}
-                            </div>
-
                             {/* Delete All Data */}
                             <div className="setting-group">
                                 <label>Danger Zone</label>
@@ -688,9 +659,6 @@ function App() {
                                 <div className="instructions-list">
                                     <div className="instruction-item">
                                         <strong>Database:</strong> <code className="path">{databasePath}</code>
-                                    </div>
-                                    <div className="instruction-item">
-                                        <strong>Dashboards:</strong> <code className="path">{dashboardPath}</code>
                                     </div>
                                 </div>
                             </div>

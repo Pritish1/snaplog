@@ -973,7 +973,7 @@
                             <div class="entries-container">
                                 {{range .Entries}}
                                 <div class="entry" data-date="{{.DateString}}" data-id="{{.ID}}">
-                                    <div class="entry-time">{{.LocalTime}}</div>
+                                    <div class="entry-time" title="{{.LocalTimeFull}}">{{.LocalTime}}</div>
                                     <div class="entry-content-wrapper">
                                         <div class="entry-content">{{.RenderedHTML}}</div>
                                     </div>
@@ -1325,7 +1325,7 @@
                 dayGroup.entries.forEach(entry => {
                     html += `
                         <div class="entry" data-date="${entry.date}" data-id="${entry.id}">
-                            <div class="entry-time">${entry.localTime}</div>
+                            <div class="entry-time" title="${entry.localTimeFull || entry.localTime}">${entry.localTime}</div>
                             <div class="entry-content-wrapper">
                                 <div class="entry-content">${entry.content}</div>
                             </div>
@@ -1497,9 +1497,7 @@
             // Format day header
             const dayName = dayGroupData.dayName || '';
             const date = dayGroupData.date || dateKey;
-            let dayText = `${dayName}, ${date}\n`;
-            
-            // Collect all entry texts with timestamps (compact format, no extra whitespace between entries)
+            let dayText = `${dayName}, ${formatDateForDisplay(date)}\n`;
             dayGroupData.entries.forEach(entry => {
                 const time = entry.localTime || '';
                 // Use rawContent if available, otherwise use content (which might be HTML)
@@ -1552,7 +1550,7 @@
                 const date = dayGroup.date || '';
                 
                 // Add day header
-                allText += `${dayName}, ${date}\n`;
+                allText += `${dayName}, ${formatDateForDisplay(date)}\n`;
                 
                 // Add all entries for this day (compact, no extra whitespace between entries)
                 dayGroup.entries.forEach(entry => {

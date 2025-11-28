@@ -51,7 +51,8 @@ type DisplayEntry struct {
 	ID           int             `json:"id"`
 	Content      string          `json:"content"`
 	RenderedHTML template.HTML   `json:"rendered_html"`
-	LocalTime    string          `json:"local_time"`
+	LocalTime    string          `json:"local_time"`    // Format: "15:04"
+	LocalTimeFull string         `json:"local_time_full"` // Format: "15:04:05" for hover
 	CreatedAt    time.Time       `json:"created_at"`
 	DateString   string          `json:"date_string"`
 }
@@ -496,12 +497,13 @@ func (a *App) getDashboardData() (*DisplayDashboardData, error) {
 		}
 		
 		displayEntries[i] = DisplayEntry{
-			ID:           entry.ID,
-			Content:      entry.Content,
-			RenderedHTML: template.HTML(renderedHTML),
-			LocalTime:    localTime.Format("15:04"),
-			CreatedAt:    entry.CreatedAt,
-			DateString:   localTime.Format("2006-01-02"),
+			ID:            entry.ID,
+			Content:       entry.Content,
+			RenderedHTML:  template.HTML(renderedHTML),
+			LocalTime:     localTime.Format("15:04"),
+			LocalTimeFull: localTime.Format("15:04:05"),
+			CreatedAt:     entry.CreatedAt,
+			DateString:    localTime.Format("2006-01-02"),
 		}
 	}
 	
@@ -524,11 +526,12 @@ func (a *App) getDashboardData() (*DisplayDashboardData, error) {
         entriesJSON := make([]map[string]interface{}, len(dg.Entries))
         for j, entry := range dg.Entries {
             entriesJSON[j] = map[string]interface{}{
-                "id":        entry.ID,
-                "content":   entry.RenderedHTML,
-                "rawContent": entry.Content,
-                "localTime": entry.LocalTime,
-                "date":      entry.DateString,
+                "id":           entry.ID,
+                "content":      entry.RenderedHTML,
+                "rawContent":   entry.Content,
+                "localTime":    entry.LocalTime,
+                "localTimeFull": entry.LocalTimeFull,
+                "date":         entry.DateString,
             }
         }
 
@@ -714,20 +717,6 @@ func (a *App) serveDashboard(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(htmlContent))
-}
-
-func (a *App) getTempPath() (string, error) {
-	tempDir := os.TempDir()
-	if tempDir == "" {
-		return "", fmt.Errorf("could not get temp directory")
-	}
-	
-	snaplogTempDir := filepath.Join(tempDir, "snaplog-dashboards")
-	if err := os.MkdirAll(snaplogTempDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create temp dashboard directory: %v", err)
-	}
-	
-	return snaplogTempDir, nil
 }
 
 func (a *App) openInBrowser(urlOrPath string) error {
@@ -945,44 +934,6 @@ func (a *App) GetDatabasePath() string {
 	return filepath.Join(snaplogDir, "snaplog.db")
 }
 
-func (a *App) GetDashboardPath() string {
-	tempPath, err := a.getTempPath()
-	if err != nil {
-		return "unknown"
-	}
-	return tempPath
-}
-
-func (a *App) ClearDashboardFiles() (string, error) {
-    tempPath, err := a.getTempPath()
-    if err != nil {
-        return "", fmt.Errorf("unable to locate dashboard directory: %w", err)
-    }
-
-    entries, err := os.ReadDir(tempPath)
-    if err != nil {
-        return "", fmt.Errorf("unable to inspect dashboard directory: %w", err)
-    }
-
-    pattern := regexp.MustCompile(`^snaplog-dashboard.*\.html$`)
-    removed := 0
-
-    for _, entry := range entries {
-        if entry.Type().IsRegular() && pattern.MatchString(entry.Name()) {
-            if err := os.Remove(filepath.Join(tempPath, entry.Name())); err != nil {
-                return "", fmt.Errorf("failed to remove %s: %w", entry.Name(), err)
-            }
-            removed++
-        }
-    }
-
-    message := "No dashboard files found to remove"
-    if removed > 0 {
-        message = fmt.Sprintf("Removed %d dashboard file(s)", removed)
-    }
-
-    return message, nil
-}
 
 func (a *App) Quit() {
 	a.logf("Quitting SnapLog...\n")
