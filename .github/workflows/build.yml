@@ -228,6 +228,14 @@ jobs:
           echo "${{ secrets.NOTARY_P8_KEY }}" > notary_key.p8
           chmod 600 notary_key.p8
 
+      - name: Verify jq is available
+        run: |
+          if ! command -v jq &> /dev/null; then
+            echo "jq is not installed, installing..."
+            brew install jq
+          fi
+          jq --version
+
       - name: Wait for notarization
         id: wait
         timeout-minutes: 1800  # 30 hours max
@@ -240,15 +248,44 @@ jobs:
           echo "Waiting for notarization to complete..."
           echo "Submission ID: $SUBMISSION_ID"
           
+          if [ -z "$SUBMISSION_ID" ] || [ "$SUBMISSION_ID" = "" ]; then
+            echo "ERROR: Submission ID is empty!"
+            exit 1
+          fi
+          
           while [ $ELAPSED -lt $MAX_WAIT ]; do
+            # Get status with error handling
+            set +e  # Don't exit on error
             STATUS_OUTPUT=$(xcrun notarytool log \
               --key notary_key.p8 \
               --key-id "${{ secrets.NOTARY_KEY_ID }}" \
               --issuer "${{ secrets.NOTARY_ISSUER_ID }}" \
               "$SUBMISSION_ID" \
               --output-format json 2>&1)
+            NOTARY_EXIT_CODE=$?
+            set -e  # Re-enable exit on error
             
-            STATUS=$(echo "$STATUS_OUTPUT" | jq -r '.status // "Unknown"')
+            if [ $NOTARY_EXIT_CODE -ne 0 ]; then
+              echo "Warning: notarytool log failed (exit code $NOTARY_EXIT_CODE)"
+              echo "Output: $STATUS_OUTPUT"
+              echo "This might be normal if notarization just started. Retrying in $INTERVAL seconds..."
+              sleep $INTERVAL
+              ELAPSED=$((ELAPSED + INTERVAL))
+              continue
+            fi
+            
+            # Try to parse status
+            STATUS=$(echo "$STATUS_OUTPUT" | jq -r '.status // "Unknown"' 2>/dev/null || echo "Unknown")
+            
+            if [ "$STATUS" = "Unknown" ]; then
+              echo "Could not parse status from output:"
+              echo "$STATUS_OUTPUT"
+              echo "Retrying in $INTERVAL seconds..."
+              sleep $INTERVAL
+              ELAPSED=$((ELAPSED + INTERVAL))
+              continue
+            fi
+            
             echo "[$(date +%H:%M:%S)] Status: $STATUS (${ELAPSED}s elapsed)"
             
             case "$STATUS" in
@@ -266,8 +303,7 @@ jobs:
                 echo "Still processing..."
                 ;;
               *)
-                echo "Unknown status: $STATUS"
-                echo "Output: $STATUS_OUTPUT"
+                echo "Status: $STATUS (continuing to wait...)"
                 ;;
             esac
             
