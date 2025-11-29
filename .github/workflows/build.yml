@@ -50,8 +50,9 @@ jobs:
           retention-days: 30
 
   build-macos:
-    name: Build macOS
+    name: Build and Sign macOS
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -105,6 +106,27 @@ jobs:
       - name: Verify code signature
         run: codesign --verify --verbose build/bin/snaplog.app
 
+      - name: Verify entitlements are embedded
+        run: |
+          echo "Checking entitlements in signed app..."
+          ENTITLEMENTS=$(codesign -d --entitlements - build/bin/snaplog.app 2>&1)
+          if echo "$ENTITLEMENTS" | grep -q "com.apple.security.device.keyboard"; then
+            echo "✓ Keyboard entitlement found"
+          else
+            echo "✗ ERROR: Keyboard entitlement NOT found!"
+            exit 1
+          fi
+          if echo "$ENTITLEMENTS" | grep -q "com.apple.security.network.client"; then
+            echo "✓ Network client entitlement found"
+          else
+            echo "✗ ERROR: Network client entitlement NOT found!"
+            exit 1
+          fi
+          echo "All entitlements verified successfully"
+          echo ""
+          echo "Full entitlements:"
+          echo "$ENTITLEMENTS"
+
       - name: Create notarization key file
         run: |
           echo "${{ secrets.NOTARY_P8_KEY }}" > notary_key.p8
@@ -116,19 +138,23 @@ jobs:
           zip -r snaplog.zip snaplog.app
           cd ../..
 
-      - name: Notarize app
+      - name: Submit for notarization
+        id: notarize
         run: |
-          xcrun notarytool submit build/bin/snaplog.zip \
+          SUBMIT_OUTPUT=$(xcrun notarytool submit build/bin/snaplog.zip \
             --key notary_key.p8 \
             --key-id "${{ secrets.NOTARY_KEY_ID }}" \
             --issuer "${{ secrets.NOTARY_ISSUER_ID }}" \
-            --wait
-
-      - name: Staple notarization
-        run: xcrun stapler staple build/bin/snaplog.app
-
-      - name: Verify notarization
-        run: xcrun stapler validate build/bin/snaplog.app
+            --output-format json)
+          
+          SUBMISSION_ID=$(echo "$SUBMIT_OUTPUT" | jq -r '.id')
+          echo "submission_id=$SUBMISSION_ID" >> $GITHUB_OUTPUT
+          echo "::notice title=Notarization Submitted::Submission ID: $SUBMISSION_ID"
+          echo "Notarization submitted. Submission ID: $SUBMISSION_ID"
+          echo "This will be processed in a separate job."
+          
+          # Save submission ID to file for the next job
+          echo "$SUBMISSION_ID" > submission_id.txt
 
       - name: Clean up notary key and zip
         if: always()
@@ -141,11 +167,132 @@ jobs:
         run: |
           security delete-keychain build.keychain || true
 
+      - name: Upload signed app (before notarization)
+        uses: actions/upload-artifact@v4
+        with:
+          name: snaplog-macos-signed
+          path: build/bin/snaplog.app
+          retention-days: 7
+
+      - name: Upload notarization submission ID
+        uses: actions/upload-artifact@v4
+        with:
+          name: notarization-submission-id
+          path: submission_id.txt
+          retention-days: 7
+
+  notarize-macos:
+    name: Notarize and Package macOS
+    runs-on: macos-latest
+    needs: build-macos
+    timeout-minutes: 1800  # 30 hours max
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download signed app
+        uses: actions/download-artifact@v4
+        with:
+          name: snaplog-macos-signed
+          path: build/bin
+
+      - name: Download notarization submission ID
+        uses: actions/download-artifact@v4
+        with:
+          name: notarization-submission-id
+          path: .
+
+      - name: Get notarization submission ID
+        id: get-id
+        run: |
+          # Download submission ID from previous job
+          mkdir -p submission
+          # Try to get from artifact first
+          if [ -f submission_id.txt ]; then
+            SUBMISSION_ID=$(cat submission_id.txt)
+          else
+            # Fallback: try to get from job outputs (may not work across jobs)
+            SUBMISSION_ID="${{ needs.build-macos.outputs.submission_id }}"
+          fi
+          
+          if [ -z "$SUBMISSION_ID" ] || [ "$SUBMISSION_ID" = "" ] || [ "$SUBMISSION_ID" = "null" ]; then
+            echo "ERROR: No submission ID found"
+            exit 1
+          fi
+          
+          echo "submission_id=$SUBMISSION_ID" >> $GITHUB_OUTPUT
+          echo "Waiting for notarization: $SUBMISSION_ID"
+
+      - name: Create notarization key file
+        run: |
+          echo "${{ secrets.NOTARY_P8_KEY }}" > notary_key.p8
+          chmod 600 notary_key.p8
+
+      - name: Wait for notarization
+        id: wait
+        timeout-minutes: 1800  # 30 hours max
+        run: |
+          SUBMISSION_ID=$(cat submission_id.txt)
+          MAX_WAIT=108000  # 30 hours in seconds
+          ELAPSED=0
+          INTERVAL=180  # Check every 3 minutes
+          
+          echo "Waiting for notarization to complete..."
+          echo "Submission ID: $SUBMISSION_ID"
+          
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            STATUS_OUTPUT=$(xcrun notarytool log \
+              --key notary_key.p8 \
+              --key-id "${{ secrets.NOTARY_KEY_ID }}" \
+              --issuer "${{ secrets.NOTARY_ISSUER_ID }}" \
+              "$SUBMISSION_ID" \
+              --output-format json 2>&1)
+            
+            STATUS=$(echo "$STATUS_OUTPUT" | jq -r '.status // "Unknown"')
+            echo "[$(date +%H:%M:%S)] Status: $STATUS (${ELAPSED}s elapsed)"
+            
+            case "$STATUS" in
+              "Accepted")
+                echo "✓ Notarization succeeded!"
+                exit 0
+                ;;
+              "Invalid"|"Rejected")
+                echo "✗ Notarization failed!"
+                echo "Full log:"
+                echo "$STATUS_OUTPUT"
+                exit 1
+                ;;
+              "In Progress"|"Pending")
+                echo "Still processing..."
+                ;;
+              *)
+                echo "Unknown status: $STATUS"
+                echo "Output: $STATUS_OUTPUT"
+                ;;
+            esac
+            
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+          
+          echo "✗ Notarization timed out after 30 hours"
+          exit 1
+
+      - name: Staple notarization
+        run: xcrun stapler staple build/bin/snaplog.app
+
+      - name: Verify notarization
+        run: xcrun stapler validate build/bin/snaplog.app
+
+      - name: Clean up notary key
+        if: always()
+        run: rm -f notary_key.p8
+
       - name: Create DMG
         run: |
           hdiutil create -volname "SnapLog" -srcfolder build/bin/snaplog.app -ov -format UDZO snaplog.dmg
 
-      - name: Upload macOS artifact
+      - name: Upload notarized macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: snaplog-macos-amd64
@@ -169,20 +316,86 @@ jobs:
           name: snaplog-windows-amd64
           path: dist/windows
 
-      - name: Download macOS artifact
+      - name: Download macOS signed app (may not be notarized yet)
+        uses: actions/download-artifact@v4
+        with:
+          name: snaplog-macos-signed
+          path: dist/macos
+          continue-on-error: true
+
+      - name: Download macOS notarized artifacts (if available)
+        uses: actions/download-artifact@v4
+        with:
+          name: snaplog-macos-amd64
+          path: dist/macos-notarized
+          continue-on-error: true
+
+      - name: Prepare release files
+        run: |
+          mkdir -p dist/release
+          cp dist/windows/snaplog.exe dist/release/ || true
+          
+          # Use notarized version if available, otherwise use signed version
+          if [ -f dist/macos-notarized/snaplog.app ]; then
+            echo "Using notarized macOS app"
+            cp -r dist/macos-notarized/snaplog.app dist/release/ || true
+            cp dist/macos-notarized/snaplog.dmg dist/release/ || true
+          elif [ -f dist/macos/snaplog.app ]; then
+            echo "Using signed (not yet notarized) macOS app"
+            cp -r dist/macos/snaplog.app dist/release/ || true
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/release/*
+          generate_release_notes: true
+          body: |
+            ## Downloads
+            
+            - **Windows**: `snaplog.exe` (unsigned)
+            - **macOS**: `snaplog.app` and `snaplog.dmg`
+            
+            > **Note**: macOS app may be signed but not yet notarized if notarization is still in progress. 
+            > The notarized version will be available in a separate release or update.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-release-with-notarized:
+    name: Update Release with Notarized macOS
+    needs: [release, notarize-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download notarized macOS artifacts
         uses: actions/download-artifact@v4
         with:
           name: snaplog-macos-amd64
           path: dist/macos
 
-      - name: Create Release
+      - name: Get release tag
+        id: get-tag
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Upload notarized files to release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/windows/snaplog.exe
             dist/macos/snaplog.app
             dist/macos/snaplog.dmg
-          generate_release_notes: true
+          tag_name: ${{ steps.get-tag.outputs.tag }}
+          body: |
+            ## Notarized macOS Build Available
+            
+            The macOS app has been successfully notarized by Apple.
+            
+            - `snaplog.app` - Notarized application
+            - `snaplog.dmg` - Disk image with notarized app
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

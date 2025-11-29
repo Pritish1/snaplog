@@ -21,12 +21,14 @@ function App() {
     const [settings, setSettings] = useState({
         hotkey_modifiers: ['ctrl', 'shift'],
         hotkey_key: 'l',
-        theme: 'dark'
+        theme: 'dark',
+        dashboard_port: 37564
     });
     const [tempSettings, setTempSettings] = useState({
         hotkey_modifiers: ['ctrl', 'shift'],
         hotkey_key: 'l',
-        theme: 'dark'
+        theme: 'dark',
+        dashboard_port: 37564
     });
 
     useEffect(() => {
@@ -565,6 +567,29 @@ function App() {
                                         Light
                                     </label>
                                 </div>
+                            </div>
+
+                            {/* Dashboard Port Configuration */}
+                            <div className="setting-group">
+                                <label>Dashboard Port</label>
+                                <p className="setting-note">Port for the dashboard HTTP server. If the port is in use, SnapLog will automatically try nearby ports.</p>
+                                <input
+                                    type="number"
+                                    min="1024"
+                                    max="65535"
+                                    value={tempSettings.dashboard_port || 37564}
+                                    onChange={(e) => {
+                                        const port = parseInt(e.target.value) || 37564;
+                                        setTempSettings({...tempSettings, dashboard_port: port});
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px',
+                                        fontSize: '14px',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '4px'
+                                    }}
+                                />
                             </div>
 
                             {/* Delete All Data */}

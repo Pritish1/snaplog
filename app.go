@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -37,6 +38,7 @@ type Settings struct {
 	HotkeyKey       string   `json:"hotkey_key"`
 	FirstRun        bool     `json:"first_run"`
 	Theme           string   `json:"theme"` // "light" or "dark"
+	DashboardPort   int      `json:"dashboard_port"` // Port for dashboard HTTP server
 }
 
 // LogEntry represents a log entry in the database
@@ -96,8 +98,9 @@ func NewApp() *App {
 			HotkeyKey:       "l",
 			FirstRun:        true,
 			Theme:           "dark",
+			DashboardPort:   37564, // Default rarely used port
 		},
-		dashboardPort: 37564, // Rarely used port
+		dashboardPort: 37564, // Will be updated from settings in startup
 	}
 }
 
@@ -110,6 +113,12 @@ func (a *App) startup(ctx context.Context) {
 	}
 	
 	a.loadSettings()
+	
+	// Set dashboard port from settings (with fallback to default)
+	if a.settings.DashboardPort == 0 {
+		a.settings.DashboardPort = 37564
+	}
+	a.dashboardPort = a.settings.DashboardPort
 	
 	if err := a.initDatabase(); err != nil {
 		a.logf("Failed to initialize database: %v\n", err)
@@ -647,20 +656,77 @@ func (a *App) generateHTMLFromTemplate(data *DisplayDashboardData) (string, erro
 	return buf.String(), nil
 }
 
+// isPortAvailable checks if a port is available for binding
+func (a *App) isPortAvailable(port int) bool {
+	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
+	if err != nil {
+		return false
+	}
+	listener.Close()
+	return true
+}
+
+// findAvailablePort tries to find an available port, starting from the preferred port
+func (a *App) findAvailablePort(preferredPort int) (int, error) {
+	// Try preferred port first
+	if a.isPortAvailable(preferredPort) {
+		return preferredPort, nil
+	}
+	
+	// Try alternative ports near the preferred port
+	alternatives := []int{
+		preferredPort + 1,
+		preferredPort + 2,
+		preferredPort + 3,
+		preferredPort - 1,
+		preferredPort - 2,
+		preferredPort - 3,
+		37565, 37566, 37567, // Additional fallback ports
+	}
+	
+	for _, port := range alternatives {
+		if port > 1024 && port < 65535 && a.isPortAvailable(port) {
+			return port, nil
+		}
+	}
+	
+	return 0, fmt.Errorf("no available port found near %d", preferredPort)
+}
+
 // startDashboardServer starts the HTTP server for serving the dashboard
 func (a *App) startDashboardServer() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/dash", a.serveDashboard)
 	mux.HandleFunc("/api/entries/", a.handleEntryAPI)
 	
+	// Try to find an available port
+	port, err := a.findAvailablePort(a.dashboardPort)
+	if err != nil {
+		a.logf("ERROR: Failed to find available port for dashboard server: %v\n", err)
+		a.logf("Please check if another application is using port %d or nearby ports\n", a.dashboardPort)
+		a.logf("You can configure a different port in Settings\n")
+		return
+	}
+	
+	// Update dashboard port if we had to use an alternative
+	if port != a.dashboardPort {
+		a.logf("Port %d is in use, using port %d instead\n", a.dashboardPort, port)
+		a.dashboardPort = port
+		// Save the new port to settings
+		a.settings.DashboardPort = port
+		if err := a.saveSettings(); err != nil {
+			a.logf("Warning: Failed to save new port to settings: %v\n", err)
+		}
+	}
+	
 	server := &http.Server{
-		Addr:    fmt.Sprintf("localhost:%d", a.dashboardPort),
+		Addr:    fmt.Sprintf("localhost:%d", port),
 		Handler: mux,
 	}
 	
 	a.httpServer = server
 	
-	a.logf("Dashboard server starting on http://localhost:%d/dash\n", a.dashboardPort)
+	a.logf("Dashboard server starting on http://localhost:%d/dash\n", port)
 	
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		a.logf("Failed to start dashboard server: %v\n", err)
@@ -1008,8 +1074,30 @@ func (a *App) SetSettings(settings *Settings) error {
 	a.settings = settings
 	a.settings.FirstRun = false
 	
+	// Validate and set dashboard port
+	if a.settings.DashboardPort == 0 {
+		a.settings.DashboardPort = 37564
+	}
+	if a.settings.DashboardPort < 1024 || a.settings.DashboardPort > 65535 {
+		return fmt.Errorf("dashboard port must be between 1024 and 65535")
+	}
+	
 	if err := a.saveSettings(); err != nil {
 		return fmt.Errorf("failed to save settings: %v", err)
+	}
+	
+	// Update dashboard port if changed
+	if a.dashboardPort != a.settings.DashboardPort {
+		a.dashboardPort = a.settings.DashboardPort
+		// Restart dashboard server with new port
+		if a.httpServer != nil {
+			// Shutdown old server
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			a.httpServer.Shutdown(ctx)
+		}
+		// Start new server
+		go a.startDashboardServer()
 	}
 	
 	a.stopHotkeyDetection()
