@@ -40,6 +40,7 @@ export namespace main {
 	    hotkey_key: string;
 	    first_run: boolean;
 	    theme: string;
+	    dashboard_port: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -51,6 +52,7 @@ export namespace main {
 	        this.hotkey_key = source["hotkey_key"];
 	        this.first_run = source["first_run"];
 	        this.theme = source["theme"];
+	        this.dashboard_port = source["dashboard_port"];
 	    }
 	}
 	export class Tag {
