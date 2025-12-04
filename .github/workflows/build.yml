@@ -195,24 +195,32 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: snaplog-macos-signed
-          path: build/bin
+          path: temp-download
 
-      - name: Verify app exists
+      - name: Move app to build/bin
         run: |
-          if [ ! -d "build/bin/snaplog.app" ]; then
-            echo "ERROR: build/bin/snaplog.app not found after download"
-            echo "Contents of build/bin:"
-            ls -la build/bin/ || echo "build/bin does not exist"
+          mkdir -p build/bin
+          
+          # Find the app in the downloaded structure
+          if [ -d "temp-download/build/bin/snaplog.app" ]; then
+            cp -R temp-download/build/bin/snaplog.app build/bin/
+          elif [ -d "temp-download/snaplog.app" ]; then
+            cp -R temp-download/snaplog.app build/bin/
+          else
+            echo "ERROR: Could not find snaplog.app in downloaded artifact"
+            echo "Contents of temp-download:"
+            find temp-download -type d -name "*.app" 2>/dev/null || ls -la temp-download/
             exit 1
           fi
           
+          # Verify it's a valid app bundle
           if [ ! -d "build/bin/snaplog.app/Contents" ]; then
             echo "ERROR: build/bin/snaplog.app is not a valid .app bundle (missing Contents/)"
             exit 1
           fi
           
           echo "APP_PATH=build/bin/snaplog.app" >> $GITHUB_ENV
-          echo "✓ App verified at: build/bin/snaplog.app"
+          echo "✓ App located at: build/bin/snaplog.app"
 
       - name: Download notarization submission ID
         uses: actions/download-artifact@v4
