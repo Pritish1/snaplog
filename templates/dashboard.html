@@ -802,6 +802,8 @@
             color: #2c3e50;
             cursor: pointer;
             min-width: 150px;
+            max-width: 200px;
+            width: 150px;
         }
         
         .tag-select:focus {
@@ -830,6 +832,16 @@
             align-items: center;
             gap: 6px;
             animation: fadeIn 0.3s ease;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .tag-chip span:first-child {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         
         .tag-chip:hover {
@@ -1270,7 +1282,7 @@
             selectedTags.forEach(tagName => {
                 const chip = document.createElement('div');
                 chip.className = 'tag-chip';
-                chip.innerHTML = `<span>#${tagName}</span><span class="tag-remove" onclick="removeTag('${tagName}')">×</span>`;
+                chip.innerHTML = `<span title="#${tagName}">#${tagName}</span><span class="tag-remove" onclick="removeTag('${tagName}')">×</span>`;
                 container.appendChild(chip);
             });
         }

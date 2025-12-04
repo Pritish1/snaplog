@@ -381,6 +381,12 @@ func (a *App) LogText(text string) error {
 		return nil
 	}
 
+	// Enforce character limit
+	const maxLength = 50000
+	if len(text) > maxLength {
+		return fmt.Errorf("entry exceeds maximum length of %d characters", maxLength)
+	}
+
 	a.logf("LogText called with: '%s'\n", text)
 
 	if a.db == nil {
@@ -877,6 +883,11 @@ func (a *App) GetMostRecentEntry() (*LogEntry, error) {
 }
 
 func (a *App) UpdateEntry(id int, newContent string) error {
+	// Enforce character limit
+	const maxLength = 50000
+	if len(newContent) > maxLength {
+		return fmt.Errorf("entry exceeds maximum length of %d characters", maxLength)
+	}
 	if a.db == nil {
 		return fmt.Errorf("database not initialized")
 	}

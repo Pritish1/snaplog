@@ -5,6 +5,7 @@ import {EventsOn} from "../wailsjs/runtime/runtime";
 
 function App() {
     const [text, setText] = useState('');
+    const [charCount, setCharCount] = useState(0);
     const [showSettings, setShowSettings] = useState(false);
     const [showInstructions, setShowInstructions] = useState(false);
     const [previewMode, setPreviewMode] = useState(false);
@@ -136,7 +137,15 @@ function App() {
         }
     }, [editingEntryId, showSettings, deleteConfirmId]);
 
-    const handleTextChange = (e) => setText(e.target.value);
+    const MAX_TEXT_LENGTH = 50000;
+    
+    const handleTextChange = (e) => {
+        const newText = e.target.value;
+        if (newText.length <= MAX_TEXT_LENGTH) {
+            setText(newText);
+            setCharCount(newText.length);
+        }
+    };
 
     const logText = async () => {
         // If text is empty, just minimize the window
@@ -161,6 +170,7 @@ function App() {
                 // If ProcessCommand succeeds, it shouldn't happen for editprev/delprev
                 // They should return errors with special format
                 setText(''); // Clear the input
+                setCharCount(0); // Reset character count
                 // Don't hide window for settings command
                 if (trimmedText !== '/settings') {
                     setTimeout(() => {
@@ -192,6 +202,7 @@ function App() {
                         setDeleteConfirmId(entryId);
                         setDeleteConfirmPreview(preview);
                         setText(''); // Clear the input
+                        setCharCount(0); // Reset character count
                         // Don't hide window, show confirmation
                         return;
                     }
@@ -199,6 +210,7 @@ function App() {
                     // Actual error or other command
                     console.error('Error processing command:', errorMsg);
                     setText('');
+                    setCharCount(0); // Reset character count
                     if (trimmedText !== '/settings') {
                         setTimeout(() => {
                             HideWindow();
@@ -216,6 +228,7 @@ function App() {
                 // If ProcessCommand succeeds, it shouldn't happen for edit/delete
                 // They should return errors with special format
                 setText('');
+                setCharCount(0); // Reset character count
                 setTimeout(() => {
                     HideWindow();
                 }, 100);
@@ -243,6 +256,7 @@ function App() {
                         setDeleteConfirmId(entryId);
                         setDeleteConfirmPreview(preview);
                         setText(''); // Clear the input
+                        setCharCount(0); // Reset character count
                         // Don't hide window, show confirmation
                         return;
                     }
@@ -250,6 +264,7 @@ function App() {
                     // Actual error
                     console.error('Error processing command:', errorMsg);
                     setText('');
+                    setCharCount(0); // Reset character count
                     setTimeout(() => {
                         HideWindow();
                     }, 100);
@@ -263,6 +278,7 @@ function App() {
             try {
                 await UpdateEntry(editingEntryId, text);
                 setText(''); // Clear the input
+                setCharCount(0); // Reset character count
                 setEditingEntryId(null); // Exit edit mode
                 // Don't hide window - let user continue working
             } catch (error) {
@@ -276,6 +292,7 @@ function App() {
         try {
             await LogText(text);
             setText(''); // Clear the input
+            setCharCount(0); // Reset character count
             
             // Hide the window after successful logging
             setTimeout(() => {
@@ -300,6 +317,7 @@ function App() {
             if (editingEntryId) {
                 setEditingEntryId(null);
                 setText('');
+                setCharCount(0);
             }
             // If delete confirmation is open, cancel it
             if (deleteConfirmId) {
@@ -398,6 +416,7 @@ function App() {
             setDeleteConfirmId(null);
             setDeleteConfirmPreview('');
             setText('');
+            setCharCount(0); // Reset character count
             // Keep window open after successful delete - don't minimize
         } catch (error) {
             console.error('Error deleting entry:', error);
@@ -409,6 +428,7 @@ function App() {
         setDeleteConfirmId(null);
         setDeleteConfirmPreview('');
         setText('');
+        setCharCount(0); // Reset character count
         // Don't hide window on cancel - let user continue working
     };
 
@@ -486,17 +506,29 @@ function App() {
                         }}
                     />
                 ) : (
-                    <textarea
-                        id="textInput"
-                        className="text-input"
-                        value={text}
-                        onChange={handleTextChange}
-                        onKeyPress={handleKeyPress}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Enter text to log... (Markdown supported)"
-                        rows="4"
-                        autoFocus
-                    />
+                    <div>
+                        <textarea
+                            id="textInput"
+                            className="text-input"
+                            value={text}
+                            onChange={handleTextChange}
+                            onKeyPress={handleKeyPress}
+                            onKeyDown={handleKeyDown}
+                            placeholder="Enter text to log... (Markdown supported)"
+                            rows="4"
+                            autoFocus
+                            maxLength={MAX_TEXT_LENGTH}
+                        />
+                        <div className="char-counter" style={{
+                            fontSize: '0.75rem',
+                            color: '#9ca3af',
+                            textAlign: 'right',
+                            marginTop: '4px',
+                            paddingRight: '4px'
+                        }}>
+                            {charCount.toLocaleString()}/{MAX_TEXT_LENGTH.toLocaleString()}
+                        </div>
+                    </div>
                 )}
             </div>
 

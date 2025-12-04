@@ -168,10 +168,17 @@ jobs:
           security delete-keychain build.keychain || true
 
       - name: Upload signed app (before notarization)
+        run: |
+          # Create a clean directory structure for artifact upload
+          mkdir -p dist
+          cp -R build/bin/snaplog.app dist/
+        shell: bash
+
+      - name: Upload signed app (before notarization)
         uses: actions/upload-artifact@v4
         with:
           name: snaplog-macos-signed
-          path: build/bin/snaplog.app
+          path: dist/snaplog.app
           retention-days: 7
 
       - name: Upload notarization submission ID
@@ -194,7 +201,27 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: snaplog-macos-signed
-          path: build/bin
+          path: dist
+
+      - name: Move app to build/bin
+        run: |
+          mkdir -p build/bin
+          if [ -d "dist/snaplog.app" ]; then
+            cp -R dist/snaplog.app build/bin/
+            APP_PATH="build/bin/snaplog.app"
+          elif [ -d "snaplog.app" ]; then
+            cp -R snaplog.app build/bin/
+            APP_PATH="build/bin/snaplog.app"
+          else
+            echo "ERROR: Could not find snaplog.app in downloaded artifact"
+            echo "Contents of dist:"
+            ls -la dist/ || echo "dist does not exist"
+            echo "Contents of root:"
+            ls -la | grep -i snaplog || echo "No snaplog files in root"
+            exit 1
+          fi
+          echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
+          echo "App located at: $APP_PATH"
 
       - name: Download notarization submission ID
         uses: actions/download-artifact@v4
@@ -315,10 +342,10 @@ jobs:
           exit 1
 
       - name: Staple notarization
-        run: xcrun stapler staple build/bin/snaplog.app
+        run: xcrun stapler staple "$APP_PATH"
 
       - name: Verify notarization
-        run: xcrun stapler validate build/bin/snaplog.app
+        run: xcrun stapler validate "$APP_PATH"
 
       - name: Clean up notary key
         if: always()
@@ -326,7 +353,7 @@ jobs:
 
       - name: Create DMG
         run: |
-          hdiutil create -volname "SnapLog" -srcfolder build/bin/snaplog.app -ov -format UDZO snaplog.dmg
+          hdiutil create -volname "SnapLog" -srcfolder "$APP_PATH" -ov -format UDZO snaplog.dmg
 
       - name: Upload notarized macOS artifact
         uses: actions/upload-artifact@v4
