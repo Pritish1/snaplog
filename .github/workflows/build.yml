@@ -168,17 +168,11 @@ jobs:
           security delete-keychain build.keychain || true
 
       - name: Upload signed app (before notarization)
-        run: |
-          # Create a clean directory structure for artifact upload
-          mkdir -p dist
-          cp -R build/bin/snaplog.app dist/
-        shell: bash
-
-      - name: Upload signed app (before notarization)
         uses: actions/upload-artifact@v4
         with:
           name: snaplog-macos-signed
-          path: dist/snaplog.app
+          path: build/bin/snaplog.app
+          if-no-files-found: error
           retention-days: 7
 
       - name: Upload notarization submission ID
@@ -201,27 +195,24 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: snaplog-macos-signed
-          path: dist
+          path: build/bin
 
-      - name: Move app to build/bin
+      - name: Verify app exists
         run: |
-          mkdir -p build/bin
-          if [ -d "dist/snaplog.app" ]; then
-            cp -R dist/snaplog.app build/bin/
-            APP_PATH="build/bin/snaplog.app"
-          elif [ -d "snaplog.app" ]; then
-            cp -R snaplog.app build/bin/
-            APP_PATH="build/bin/snaplog.app"
-          else
-            echo "ERROR: Could not find snaplog.app in downloaded artifact"
-            echo "Contents of dist:"
-            ls -la dist/ || echo "dist does not exist"
-            echo "Contents of root:"
-            ls -la | grep -i snaplog || echo "No snaplog files in root"
+          if [ ! -d "build/bin/snaplog.app" ]; then
+            echo "ERROR: build/bin/snaplog.app not found after download"
+            echo "Contents of build/bin:"
+            ls -la build/bin/ || echo "build/bin does not exist"
             exit 1
           fi
-          echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
-          echo "App located at: $APP_PATH"
+          
+          if [ ! -d "build/bin/snaplog.app/Contents" ]; then
+            echo "ERROR: build/bin/snaplog.app is not a valid .app bundle (missing Contents/)"
+            exit 1
+          fi
+          
+          echo "APP_PATH=build/bin/snaplog.app" >> $GITHUB_ENV
+          echo "✓ App verified at: build/bin/snaplog.app"
 
       - name: Download notarization submission ID
         uses: actions/download-artifact@v4
