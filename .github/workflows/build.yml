@@ -322,6 +322,29 @@ jobs:
           rm -f notary_key.p8
           rm -f build/bin/snaplog-arm.zip
 
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain build.keychain || true
+
+      - name: Verify app exists before upload
+        run: |
+          echo "=== PRE-UPLOAD VERIFICATION ==="
+          echo "Checking if build/bin/snaplog.app exists..."
+          if [ ! -d "build/bin/snaplog.app" ]; then
+            echo "ERROR: build/bin/snaplog.app does not exist!"
+            echo "Contents of build/bin:"
+            ls -la build/bin/ || echo "build/bin does not exist"
+            exit 1
+          fi
+          echo "✓ build/bin/snaplog.app exists"
+          echo "App bundle structure:"
+          ls -la build/bin/snaplog.app/
+          echo "Contents folder:"
+          ls -la build/bin/snaplog.app/Contents/ || echo "Contents folder missing!"
+          echo "App size:"
+          du -sh build/bin/snaplog.app
+
       - name: Upload signed app (before notarization)
         uses: actions/upload-artifact@v4
         with:
@@ -336,11 +359,6 @@ jobs:
           name: notarization-submission-id-arm
           path: submission_id.txt
           retention-days: 7
-
-      - name: Clean up keychain
-        if: always()
-        run: |
-          security delete-keychain build.keychain || true
 
   notarize-macos-intel:
     name: Notarize and Package macOS (Intel)
