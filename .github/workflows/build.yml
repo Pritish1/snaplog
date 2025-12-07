@@ -55,8 +55,8 @@ jobs:
           path: build/bin/snaplog.exe
           retention-days: 30
 
-  build-macos:
-    name: Build and Sign macOS
+  build-macos-intel:
+    name: Build and Sign macOS (Intel)
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -92,7 +92,7 @@ jobs:
             cp assets/icons/appicon.icns build/appicon.icns
           fi
 
-      - name: Build macOS app
+      - name: Build macOS app (Intel)
         run: wails build -platform darwin/amd64
 
       - name: Import Developer ID certificate
@@ -202,7 +202,7 @@ jobs:
       - name: Upload signed app (before notarization)
         uses: actions/upload-artifact@v4
         with:
-          name: snaplog-macos-signed
+          name: snaplog-macos-intel-signed
           path: build/bin/snaplog.app
           if-no-files-found: error
           retention-days: 7
@@ -210,14 +210,92 @@ jobs:
       - name: Upload notarization submission ID
         uses: actions/upload-artifact@v4
         with:
-          name: notarization-submission-id
+          name: notarization-submission-id-intel
           path: submission_id.txt
           retention-days: 7
 
-  notarize-macos:
-    name: Notarize and Package macOS
+  build-macos-arm:
+    name: Build and Sign macOS (ARM64)
     runs-on: macos-latest
-    needs: build-macos
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Copy custom icons to build directory
+        run: |
+          mkdir -p build/darwin
+          cp assets/icons/appicon.png build/appicon.png
+          if [ -f assets/icons/appicon.icns ]; then
+            cp assets/icons/appicon.icns build/appicon.icns
+          fi
+
+      - name: Build macOS app (ARM64)
+        run: wails build -platform darwin/arm64
+
+      - name: Import Developer ID certificate
+        env:
+          DEVELOPER_ID_CERT: ${{ secrets.DEVELOPER_ID_CERT }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          echo "$DEVELOPER_ID_CERT" | base64 --decode > developer_id.p12
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import developer_id.p12 -k build.keychain -P "$DEVELOPER_ID_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
+          rm developer_id.p12
+
+      - name: Sign app with codesign
+        run: |
+          codesign --force --deep --sign "Developer ID Application: Pritish Narendra Thombare (39B7GLKL6D)" \
+            --entitlements assets/darwin/entitlements.plist \
+            --options runtime \
+            --timestamp \
+            --keychain build.keychain \
+            build/bin/snaplog.app
+
+      - name: Verify code signature
+        run: codesign --verify --verbose build/bin/snaplog.app
+
+      - name: Upload signed app (before notarization)
+        uses: actions/upload-artifact@v4
+        with:
+          name: snaplog-macos-arm-signed
+          path: build/bin/snaplog.app
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain build.keychain || true
+
+  notarize-macos-intel:
+    name: Notarize and Package macOS (Intel)
+    runs-on: macos-latest
+    needs: build-macos-intel
     timeout-minutes: 1800  # 30 hours max
     steps:
       - name: Checkout code
@@ -226,7 +304,7 @@ jobs:
       - name: Download signed app
         uses: actions/download-artifact@v4
         with:
-          name: snaplog-macos-signed
+          name: snaplog-macos-intel-signed
           path: temp-download
 
       - name: Debug downloaded artifact structure
@@ -315,7 +393,7 @@ jobs:
       - name: Download notarization submission ID
         uses: actions/download-artifact@v4
         with:
-          name: notarization-submission-id
+          name: notarization-submission-id-intel
           path: .
 
       - name: Get notarization submission ID
@@ -328,7 +406,7 @@ jobs:
             SUBMISSION_ID=$(cat submission_id.txt)
           else
             # Fallback: try to get from job outputs (may not work across jobs)
-            SUBMISSION_ID="${{ needs.build-macos.outputs.submission_id }}"
+            SUBMISSION_ID="${{ needs.build-macos-intel.outputs.submission_id }}"
           fi
           
           if [ -z "$SUBMISSION_ID" ] || [ "$SUBMISSION_ID" = "" ] || [ "$SUBMISSION_ID" = "null" ]; then
@@ -444,7 +522,7 @@ jobs:
         run: |
           hdiutil create -volname "SnapLog" -srcfolder "$APP_PATH" -ov -format UDZO snaplog.dmg
 
-      - name: Upload notarized macOS artifact
+      - name: Upload notarized macOS artifact (Intel)
         uses: actions/upload-artifact@v4
         with:
           name: snaplog-macos-amd64
@@ -453,9 +531,124 @@ jobs:
             snaplog.dmg
           retention-days: 30
 
+  notarize-macos-arm:
+    name: Notarize and Package macOS (ARM64)
+    runs-on: macos-latest
+    needs: build-macos-arm
+    timeout-minutes: 1800
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download signed app
+        uses: actions/download-artifact@v4
+        with:
+          name: snaplog-macos-arm-signed
+          path: temp-download
+
+      - name: Move app to build/bin
+        run: |
+          mkdir -p build/bin
+          if [ -d "temp-download/build/bin/snaplog.app" ]; then
+            cp -R temp-download/build/bin/snaplog.app build/bin/
+          elif [ -d "temp-download/snaplog.app" ]; then
+            cp -R temp-download/snaplog.app build/bin/
+          else
+            echo "ERROR: Could not find snaplog.app"
+            exit 1
+          fi
+          echo "APP_PATH=build/bin/snaplog.app" >> $GITHUB_ENV
+
+      - name: Create notarization key file
+        run: |
+          echo "${{ secrets.NOTARY_P8_KEY }}" > notary_key.p8
+          chmod 600 notary_key.p8
+
+      - name: Verify jq is available
+        run: |
+          if ! command -v jq &> /dev/null; then
+            echo "jq is not installed, installing..."
+            brew install jq
+          fi
+          jq --version
+
+      - name: Submit for notarization
+        run: |
+          cd build/bin
+          zip -r snaplog-arm.zip snaplog.app
+          cd ../..
+          
+          SUBMIT_OUTPUT=$(xcrun notarytool submit build/bin/snaplog-arm.zip \
+            --key notary_key.p8 \
+            --key-id "${{ secrets.NOTARY_KEY_ID }}" \
+            --issuer "${{ secrets.NOTARY_ISSUER_ID }}" \
+            --output-format json)
+          
+          SUBMISSION_ID=$(echo "$SUBMIT_OUTPUT" | jq -r '.id')
+          echo "$SUBMISSION_ID" > submission_id.txt
+          echo "submission_id=$SUBMISSION_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait for notarization
+        timeout-minutes: 1800
+        run: |
+          SUBMISSION_ID=$(cat submission_id.txt)
+          MAX_WAIT=108000
+          ELAPSED=0
+          INTERVAL=180
+          
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            STATUS_OUTPUT=$(xcrun notarytool log \
+              --key notary_key.p8 \
+              --key-id "${{ secrets.NOTARY_KEY_ID }}" \
+              --issuer "${{ secrets.NOTARY_ISSUER_ID }}" \
+              "$SUBMISSION_ID" \
+              --output-format json 2>&1 || echo '{"status":"Unknown"}')
+            
+            STATUS=$(echo "$STATUS_OUTPUT" | jq -r '.status // "Unknown"')
+            echo "[$(date +%H:%M:%S)] Status: $STATUS"
+            
+            case "$STATUS" in
+              "Accepted")
+                echo "✓ Notarization succeeded!"
+                exit 0
+                ;;
+              "Invalid"|"Rejected")
+                echo "✗ Notarization failed!"
+                exit 1
+                ;;
+            esac
+            
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+          exit 1
+
+      - name: Staple notarization
+        run: xcrun stapler staple "$APP_PATH"
+
+      - name: Verify notarization
+        run: xcrun stapler validate "$APP_PATH"
+
+      - name: Clean up notary key
+        if: always()
+        run: rm -f notary_key.p8 build/bin/snaplog-arm.zip
+
+      - name: Create DMG
+        run: |
+          hdiutil create -volname "SnapLog" -srcfolder "$APP_PATH" -ov -format UDZO snaplog-arm64.dmg
+
+      - name: Upload notarized macOS artifact (ARM64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: snaplog-macos-arm64
+          path: |
+            build/bin/snaplog.app
+            snaplog-arm64.dmg
+          retention-days: 30
+
   release:
     name: Create Release
-    needs: [build-windows, build-macos]
+    needs: [build-windows, notarize-macos-intel, notarize-macos-arm]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -471,30 +664,43 @@ jobs:
       - name: Download macOS signed app (may not be notarized yet)
         uses: actions/download-artifact@v4
         with:
-          name: snaplog-macos-signed
+          name: snaplog-macos-intel-signed
           path: dist/macos
           continue-on-error: true
 
-      - name: Download macOS notarized artifacts (if available)
+      - name: Download macOS notarized artifacts (Intel)
         uses: actions/download-artifact@v4
         with:
           name: snaplog-macos-amd64
-          path: dist/macos-notarized
-          continue-on-error: true
+          path: dist/macos-intel
+
+      - name: Download macOS notarized artifacts (ARM64)
+        uses: actions/download-artifact@v4
+        with:
+          name: snaplog-macos-arm64
+          path: dist/macos-arm64
 
       - name: Prepare release files
         run: |
           mkdir -p dist/release
           cp dist/windows/snaplog.exe dist/release/ || true
           
-          # Use notarized version if available, otherwise use signed version
-          if [ -f dist/macos-notarized/snaplog.app ]; then
-            echo "Using notarized macOS app"
-            cp -r dist/macos-notarized/snaplog.app dist/release/ || true
-            cp dist/macos-notarized/snaplog.dmg dist/release/ || true
-          elif [ -f dist/macos/snaplog.app ]; then
-            echo "Using signed (not yet notarized) macOS app"
-            cp -r dist/macos/snaplog.app dist/release/ || true
+          # Copy Intel macOS app
+          if [ -d dist/macos-intel/snaplog.app ]; then
+            echo "Including Intel macOS app"
+            cp -r dist/macos-intel/snaplog.app dist/release/snaplog-intel.app || true
+            if [ -f dist/macos-intel/snaplog.dmg ]; then
+              cp dist/macos-intel/snaplog.dmg dist/release/snaplog-intel.dmg || true
+            fi
+          fi
+          
+          # Copy ARM64 macOS app
+          if [ -d dist/macos-arm64/snaplog.app ]; then
+            echo "Including ARM64 macOS app"
+            cp -r dist/macos-arm64/snaplog.app dist/release/snaplog-arm64.app || true
+            if [ -f dist/macos-arm64/snaplog-arm64.dmg ]; then
+              cp dist/macos-arm64/snaplog-arm64.dmg dist/release/snaplog-arm64.dmg || true
+            fi
           fi
 
       - name: Create Release
@@ -506,16 +712,16 @@ jobs:
             ## Downloads
             
             - **Windows**: `snaplog.exe` (unsigned)
-            - **macOS**: `snaplog.app` and `snaplog.dmg`
+            - **macOS Intel**: `snaplog-intel.app` and `snaplog-intel.dmg` (for Intel Macs)
+            - **macOS ARM64**: `snaplog-arm64.app` and `snaplog-arm64.dmg` (for Apple Silicon Macs)
             
-            > **Note**: macOS app may be signed but not yet notarized if notarization is still in progress. 
-            > The notarized version will be available in a separate release or update.
+            > **Note**: Both macOS builds are notarized and ready to use.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   update-release-with-notarized:
     name: Update Release with Notarized macOS
-    needs: [release, notarize-macos]
+    needs: [release, notarize-macos-intel, notarize-macos-arm]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -526,7 +732,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: snaplog-macos-amd64
-          path: dist/macos
+          path: dist/macos-intel
+      
+      - name: Download notarized macOS ARM64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: snaplog-macos-arm64
+          path: dist/macos-arm64
 
       - name: Get release tag
         id: get-tag
@@ -538,16 +750,20 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/macos/snaplog.app
-            dist/macos/snaplog.dmg
+            dist/macos-intel/snaplog.app
+            dist/macos-intel/snaplog.dmg
+            dist/macos-arm64/snaplog.app
+            dist/macos-arm64/snaplog-arm64.dmg
           tag_name: ${{ steps.get-tag.outputs.tag }}
           body: |
-            ## Notarized macOS Build Available
+            ## Notarized macOS Builds Available
             
-            The macOS app has been successfully notarized by Apple.
+            Both macOS builds have been successfully notarized by Apple.
             
-            - `snaplog.app` - Notarized application
-            - `snaplog.dmg` - Disk image with notarized app
+            - `snaplog.app` - Notarized Intel application
+            - `snaplog.dmg` - Disk image with Intel app
+            - `snaplog.app` (ARM64) - Notarized Apple Silicon application  
+            - `snaplog-arm64.dmg` - Disk image with ARM64 app
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
