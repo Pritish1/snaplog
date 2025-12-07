@@ -546,18 +546,88 @@ jobs:
           name: snaplog-macos-arm-signed
           path: temp-download
 
+      - name: Debug downloaded artifact structure
+        run: |
+          echo "=== POST-DOWNLOAD DEBUG ==="
+          echo "Current working directory:"
+          pwd
+          echo ""
+          echo "Contents of temp-download:"
+          ls -la temp-download/ || echo "temp-download does not exist"
+          echo ""
+          echo "Full directory tree of temp-download:"
+          find temp-download -type d 2>/dev/null | head -20 || echo "No directories found"
+          echo ""
+          echo "All .app bundles found:"
+          find temp-download -type d -name "*.app" 2>/dev/null || echo "No .app bundles found"
+          echo ""
+          echo "All files and directories recursively:"
+          find temp-download -maxdepth 3 2>/dev/null || echo "Cannot traverse"
+          echo ""
+          echo "Checking for Contents folders:"
+          find temp-download -type d -name "Contents" 2>/dev/null || echo "No Contents folders found"
+
       - name: Move app to build/bin
         run: |
+          echo "=== MOVING APP TO build/bin ==="
           mkdir -p build/bin
+          
+          APP_FOUND=false
+          APP_SOURCE=""
+          
+          # Check all possible locations
+          echo "Checking possible locations..."
+          
           if [ -d "temp-download/build/bin/snaplog.app" ]; then
-            cp -R temp-download/build/bin/snaplog.app build/bin/
+            echo "✓ Found: temp-download/build/bin/snaplog.app"
+            APP_SOURCE="temp-download/build/bin/snaplog.app"
+            APP_FOUND=true
           elif [ -d "temp-download/snaplog.app" ]; then
-            cp -R temp-download/snaplog.app build/bin/
+            echo "✓ Found: temp-download/snaplog.app"
+            APP_SOURCE="temp-download/snaplog.app"
+            APP_FOUND=true
+          elif [ -d "temp-download/build/bin" ] && [ -d "temp-download/build/bin/Contents" ]; then
+            echo "⚠ Found extracted Contents in temp-download/build/bin/"
+            echo "Reconstructing .app bundle..."
+            mkdir -p temp-download/snaplog.app
+            mv temp-download/build/bin/* temp-download/snaplog.app/ 2>/dev/null || true
+            APP_SOURCE="temp-download/snaplog.app"
+            APP_FOUND=true
+          elif [ -d "temp-download/Contents" ]; then
+            echo "⚠ Found extracted Contents in temp-download/"
+            echo "Reconstructing .app bundle..."
+            mkdir -p temp-download/snaplog.app
+            mv temp-download/* temp-download/snaplog.app/ 2>/dev/null || true
+            APP_SOURCE="temp-download/snaplog.app"
+            APP_FOUND=true
           else
-            echo "ERROR: Could not find snaplog.app"
+            echo "✗ ERROR: Could not find snaplog.app in any expected location"
+            echo ""
+            echo "Full search results:"
+            find temp-download -type d 2>/dev/null
             exit 1
           fi
-          echo "APP_PATH=build/bin/snaplog.app" >> $GITHUB_ENV
+          
+          if [ "$APP_FOUND" = true ]; then
+            echo "Copying from $APP_SOURCE to build/bin/snaplog.app"
+            cp -R "$APP_SOURCE" build/bin/
+            
+            echo "Verifying copied app..."
+            if [ ! -d "build/bin/snaplog.app" ]; then
+              echo "✗ ERROR: Copy failed - build/bin/snaplog.app does not exist"
+              exit 1
+            fi
+            
+            if [ ! -d "build/bin/snaplog.app/Contents" ]; then
+              echo "✗ ERROR: build/bin/snaplog.app is not a valid .app bundle (missing Contents/)"
+              echo "Contents of build/bin/snaplog.app:"
+              ls -la build/bin/snaplog.app/
+              exit 1
+            fi
+            
+            echo "✓ App successfully located and verified at: build/bin/snaplog.app"
+            echo "APP_PATH=build/bin/snaplog.app" >> $GITHUB_ENV
+          fi
 
       - name: Create notarization key file
         run: |
