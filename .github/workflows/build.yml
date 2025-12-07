@@ -39,6 +39,12 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Copy custom icons to build directory
+        run: |
+          mkdir -p build/windows
+          copy assets\icons\icon.ico build\windows\icon.ico
+          copy assets\icons\appicon.png build\appicon.png
+
       - name: Build Windows app
         run: wails build -platform windows/amd64
 
@@ -77,6 +83,14 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+      - name: Copy custom icons to build directory
+        run: |
+          mkdir -p build/darwin
+          cp assets/icons/appicon.png build/appicon.png
+          if [ -f assets/icons/appicon.icns ]; then
+            cp assets/icons/appicon.icns build/appicon.icns
+          fi
 
       - name: Build macOS app
         run: wails build -platform darwin/amd64

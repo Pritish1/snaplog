@@ -29,16 +29,13 @@ import (
 //go:embed assets/icons/appicon.png
 var appIcon []byte
 
-//go:embed assets/icons/icon.ico
-var appIconWindows []byte
-
 // Settings represents the application configuration
 type Settings struct {
 	HotkeyModifiers []string `json:"hotkey_modifiers"`
 	HotkeyKey       string   `json:"hotkey_key"`
 	FirstRun        bool     `json:"first_run"`
-	Theme           string   `json:"theme"` // "light" or "dark"
-	DashboardPort   int      `json:"dashboard_port"` // Port for dashboard HTTP server
+	Theme           string   `json:"theme"`
+	DashboardPort   int      `json:"dashboard_port"`
 }
 
 // LogEntry represents a log entry in the database
@@ -53,8 +50,8 @@ type DisplayEntry struct {
 	ID           int             `json:"id"`
 	Content      string          `json:"content"`
 	RenderedHTML template.HTML   `json:"rendered_html"`
-	LocalTime    string          `json:"local_time"`    // Format: "15:04"
-	LocalTimeFull string         `json:"local_time_full"` // Format: "15:04:05" for hover
+	LocalTime    string          `json:"local_time"`
+	LocalTimeFull string         `json:"local_time_full"`
 	CreatedAt    time.Time       `json:"created_at"`
 	DateString   string          `json:"date_string"`
 }
@@ -78,7 +75,7 @@ type DisplayDashboardData struct {
 	LogoData     template.URL     `json:"logo_data"`
 	OriginalJSONRaw template.JS   `json:"original_json_raw"`
 }
-// App struct
+
 type App struct {
 	ctx          context.Context
 	hotkeyId     uintptr
@@ -90,7 +87,6 @@ type App struct {
 	dashboardPort int
 }
 
-// NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{
 		settings: &Settings{
@@ -98,9 +94,9 @@ func NewApp() *App {
 			HotkeyKey:       "l",
 			FirstRun:        true,
 			Theme:           "dark",
-			DashboardPort:   37564, // Default rarely used port
+			DashboardPort:   37564,
 		},
-		dashboardPort: 37564, // Will be updated from settings in startup
+		dashboardPort: 37564,
 	}
 }
 
@@ -114,7 +110,6 @@ func (a *App) startup(ctx context.Context) {
 	
 	a.loadSettings()
 	
-	// Set dashboard port from settings (with fallback to default)
 	if a.settings.DashboardPort == 0 {
 		a.settings.DashboardPort = 37564
 	}
@@ -125,7 +120,6 @@ func (a *App) startup(ctx context.Context) {
 		return
 	}
 	
-	// Start HTTP server for dashboard
 	go a.startDashboardServer()
 	
 	if a.settings.FirstRun {
@@ -144,7 +138,6 @@ func (a *App) shutdown(ctx context.Context) {
 	a.logf("Shutting down SnapLog...\n")
 	a.stopHotkeyDetection()
 	
-	// Shutdown HTTP server
 	if a.httpServer != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -175,19 +168,15 @@ func (a *App) initLogging() error {
 		return fmt.Errorf("failed to create snaplog directory: %v", err)
 	}
 	
-	// Create log file with date in name (one per day)
 	logFileName := fmt.Sprintf("snaplog-%s.log", time.Now().Format("2006-01-02"))
 	logFilePath := filepath.Join(snaplogDir, logFileName)
 	
-	// Open log file in append mode
 	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %v", err)
 	}
 	
 	a.logFile = logFile
-	
-	// Also write to stdout for development
 	fmt.Printf("Logging to: %s\n", logFilePath)
 	
 	return nil
@@ -381,7 +370,6 @@ func (a *App) LogText(text string) error {
 		return nil
 	}
 
-	// Enforce character limit
 	const maxLength = 50000
 	if len(text) > maxLength {
 		return fmt.Errorf("entry exceeds maximum length of %d characters", maxLength)
@@ -662,7 +650,6 @@ func (a *App) generateHTMLFromTemplate(data *DisplayDashboardData) (string, erro
 	return buf.String(), nil
 }
 
-// isPortAvailable checks if a port is available for binding
 func (a *App) isPortAvailable(port int) bool {
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
 	if err != nil {
@@ -672,14 +659,11 @@ func (a *App) isPortAvailable(port int) bool {
 	return true
 }
 
-// findAvailablePort tries to find an available port, starting from the preferred port
 func (a *App) findAvailablePort(preferredPort int) (int, error) {
-	// Try preferred port first
 	if a.isPortAvailable(preferredPort) {
 		return preferredPort, nil
 	}
 	
-	// Try alternative ports near the preferred port
 	alternatives := []int{
 		preferredPort + 1,
 		preferredPort + 2,
@@ -687,7 +671,7 @@ func (a *App) findAvailablePort(preferredPort int) (int, error) {
 		preferredPort - 1,
 		preferredPort - 2,
 		preferredPort - 3,
-		37565, 37566, 37567, // Additional fallback ports
+		37565, 37566, 37567,
 	}
 	
 	for _, port := range alternatives {
@@ -699,13 +683,11 @@ func (a *App) findAvailablePort(preferredPort int) (int, error) {
 	return 0, fmt.Errorf("no available port found near %d", preferredPort)
 }
 
-// startDashboardServer starts the HTTP server for serving the dashboard
 func (a *App) startDashboardServer() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/dash", a.serveDashboard)
 	mux.HandleFunc("/api/entries/", a.handleEntryAPI)
 	
-	// Try to find an available port
 	port, err := a.findAvailablePort(a.dashboardPort)
 	if err != nil {
 		a.logf("ERROR: Failed to find available port for dashboard server: %v\n", err)
@@ -714,11 +696,9 @@ func (a *App) startDashboardServer() {
 		return
 	}
 	
-	// Update dashboard port if we had to use an alternative
 	if port != a.dashboardPort {
 		a.logf("Port %d is in use, using port %d instead\n", a.dashboardPort, port)
 		a.dashboardPort = port
-		// Save the new port to settings
 		a.settings.DashboardPort = port
 		if err := a.saveSettings(); err != nil {
 			a.logf("Warning: Failed to save new port to settings: %v\n", err)
@@ -739,14 +719,12 @@ func (a *App) startDashboardServer() {
 	}
 }
 
-// handleEntryAPI handles API requests for entries (DELETE)
 func (a *App) handleEntryAPI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	
-	// Extract entry ID from path: /api/entries/123
 	path := strings.TrimPrefix(r.URL.Path, "/api/entries/")
 	entryID, err := strconv.Atoi(path)
 	if err != nil {
@@ -754,7 +732,6 @@ func (a *App) handleEntryAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	// Delete the entry
 	if err := a.DeleteEntry(entryID); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to delete entry: %v", err), http.StatusInternalServerError)
 		a.logf("Error deleting entry %d: %v\n", entryID, err)
@@ -771,7 +748,6 @@ func (a *App) handleEntryAPI(w http.ResponseWriter, r *http.Request) {
 	a.logf("Entry %d deleted via dashboard\n", entryID)
 }
 
-// serveDashboard generates and serves the dashboard HTML
 func (a *App) serveDashboard(w http.ResponseWriter, r *http.Request) {
 	data, err := a.getDashboardData()
 	if err != nil {
@@ -883,7 +859,6 @@ func (a *App) GetMostRecentEntry() (*LogEntry, error) {
 }
 
 func (a *App) UpdateEntry(id int, newContent string) error {
-	// Enforce character limit
 	const maxLength = 50000
 	if len(newContent) > maxLength {
 		return fmt.Errorf("entry exceeds maximum length of %d characters", maxLength)
@@ -951,7 +926,6 @@ func (a *App) DeleteEntry(id int) error {
 	return nil
 }
 
-// Tag represents a tag in the database
 type Tag struct {
 	ID        int64     `json:"id"`
 	Name      string    `json:"name"`
@@ -1085,7 +1059,6 @@ func (a *App) SetSettings(settings *Settings) error {
 	a.settings = settings
 	a.settings.FirstRun = false
 	
-	// Validate and set dashboard port
 	if a.settings.DashboardPort == 0 {
 		a.settings.DashboardPort = 37564
 	}
@@ -1097,17 +1070,13 @@ func (a *App) SetSettings(settings *Settings) error {
 		return fmt.Errorf("failed to save settings: %v", err)
 	}
 	
-	// Update dashboard port if changed
 	if a.dashboardPort != a.settings.DashboardPort {
 		a.dashboardPort = a.settings.DashboardPort
-		// Restart dashboard server with new port
 		if a.httpServer != nil {
-			// Shutdown old server
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			a.httpServer.Shutdown(ctx)
 		}
-		// Start new server
 		go a.startDashboardServer()
 	}
 	

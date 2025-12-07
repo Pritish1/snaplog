@@ -172,6 +172,13 @@
     box-shadow: 0 0 2px var(--accent-color);
 }
 
+.textarea-wrapper {
+    position: relative;
+    flex: 1;
+    display: flex;
+    min-height: 0;
+}
+
 .text-input {
     flex: 1;
     width: 100%;
@@ -202,6 +209,19 @@
     color: var(--text-secondary);
 }
 
+.char-counter {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    opacity: 0.3;
+    pointer-events: none;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    user-select: none;
+    transition: opacity 0.2s ease;
+}
+
 /* Markdown Preview Styles - CLI Theme */
 .markdown-preview {
     flex: 1;
@@ -214,6 +234,7 @@
     color: var(--text-color);
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     outline: none;
+    text-align: left;
 }
 
 .markdown-preview:focus {
@@ -226,29 +247,34 @@
     margin: 0 0 8px 0;
     padding-bottom: 4px;
     border-bottom: 1px solid var(--border-color);
+    text-align: left;
 }
 
 .markdown-preview h2 {
     color: var(--text-color);
     font-size: 1.1rem;
     margin: 8px 0 6px 0;
+    text-align: left;
 }
 
 .markdown-preview h3 {
     color: var(--text-color);
     font-size: 1rem;
     margin: 6px 0 4px 0;
+    text-align: left;
 }
 
 .markdown-preview p {
     margin: 4px 0;
     color: var(--text-color);
+    text-align: left;
 }
 
 .markdown-preview ul, .markdown-preview ol {
     margin: 4px 0;
     padding-left: 16px;
     color: var(--text-color);
+    text-align: left;
 }
 
 .markdown-preview li {
@@ -290,6 +316,7 @@
     margin: 6px 0;
     color: var(--text-secondary);
     font-style: italic;
+    text-align: left;
 }
 
 .markdown-preview strong {

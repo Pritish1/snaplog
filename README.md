@@ -29,9 +29,25 @@ wails dev
 
 ### Build
 
+**Important**: Before building, ensure custom icons are in the build directory:
+
+```bash
+# Windows
+mkdir -p build/windows
+cp assets/icons/icon.ico build/windows/icon.ico
+cp assets/icons/appicon.png build/appicon.png
+
+# macOS/Linux
+mkdir -p build/darwin
+cp assets/icons/appicon.png build/appicon.png
+```
+
+Then build:
 ```bash
 wails build
 ```
+
+The GitHub Actions workflow automatically copies icons during CI builds.
 
 ## Usage
 

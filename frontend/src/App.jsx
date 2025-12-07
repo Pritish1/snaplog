@@ -506,7 +506,7 @@ function App() {
                         }}
                     />
                 ) : (
-                    <div>
+                    <div className="textarea-wrapper">
                         <textarea
                             id="textInput"
                             className="text-input"
@@ -519,13 +519,7 @@ function App() {
                             autoFocus
                             maxLength={MAX_TEXT_LENGTH}
                         />
-                        <div className="char-counter" style={{
-                            fontSize: '0.75rem',
-                            color: '#9ca3af',
-                            textAlign: 'right',
-                            marginTop: '4px',
-                            paddingRight: '4px'
-                        }}>
+                        <div className="char-counter">
                             {charCount.toLocaleString()}/{MAX_TEXT_LENGTH.toLocaleString()}
                         </div>
                     </div>
@@ -610,9 +604,26 @@ function App() {
                                     min="1024"
                                     max="65535"
                                     value={tempSettings.dashboard_port || 37564}
+                                    onKeyDown={(e) => {
+                                        const value = e.target.value;
+                                        const isControlKey = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'].includes(e.key);
+                                        const isModifierKey = e.ctrlKey || e.metaKey || e.altKey;
+                                        if (value.length >= 5 && !isControlKey && !isModifierKey && /^\d$/.test(e.key)) {
+                                            e.preventDefault();
+                                        }
+                                    }}
                                     onChange={(e) => {
-                                        const port = parseInt(e.target.value) || 37564;
-                                        setTempSettings({...tempSettings, dashboard_port: port});
+                                        let value = e.target.value;
+                                        if (value.length > 5) {
+                                            value = value.slice(0, 5);
+                                        }
+                                        if (value === '' || value === '-') {
+                                            return;
+                                        }
+                                        const port = parseInt(value);
+                                        if (!isNaN(port)) {
+                                            setTempSettings({...tempSettings, dashboard_port: port});
+                                        }
                                     }}
                                     style={{
                                         width: '100%',
@@ -672,9 +683,6 @@ function App() {
                             <div className="instructions-section">
                                 <h3>Keyboard Shortcuts</h3>
                                 <div className="instructions-list">
-                                    <div className="instruction-item">
-                                        <strong>{isMac ? 'Cmd+Tab' : 'Ctrl+Tab'}:</strong> Toggle between Edit and Preview mode
-                                    </div>
                                     <div className="instruction-item">
                                         <strong>Enter:</strong> Log text and hide window
                                     </div>
