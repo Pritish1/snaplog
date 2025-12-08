@@ -920,12 +920,53 @@ jobs:
           echo "Release files prepared:"
           ls -lh dist/release/
 
-      - name: Create or Update Release
+      - name: Delete existing release if present
+        run: |
+          TAG=${{ steps.get-tag.outputs.tag }}
+          echo "Checking for existing release with tag: $TAG"
+          
+          # Get release ID if it exists using GitHub API
+          RELEASE_RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG")
+          
+          HTTP_CODE=$(echo "$RELEASE_RESPONSE" | tail -n1)
+          RELEASE_BODY=$(echo "$RELEASE_RESPONSE" | sed '$d')
+          
+          if [ "$HTTP_CODE" = "200" ] && [ -n "$RELEASE_BODY" ]; then
+            # Extract release ID using jq if available, otherwise use grep/sed
+            if command -v jq &> /dev/null; then
+              RELEASE_ID=$(echo "$RELEASE_BODY" | jq -r '.id // empty')
+            else
+              RELEASE_ID=$(echo "$RELEASE_BODY" | grep -o '"id":[[:space:]]*[0-9]*' | head -1 | grep -o '[0-9]*')
+            fi
+            
+            if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]; then
+              echo "Found existing release (ID: $RELEASE_ID), deleting it..."
+              DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID")
+              DELETE_CODE=$(echo "$DELETE_RESPONSE" | tail -n1)
+              if [ "$DELETE_CODE" = "204" ]; then
+                echo "✓ Existing release deleted successfully"
+              else
+                echo "⚠ Warning: Delete returned status $DELETE_CODE"
+              fi
+            else
+              echo "Could not extract release ID from response"
+            fi
+          else
+            echo "No existing release found for tag $TAG (HTTP $HTTP_CODE)"
+          fi
+        continue-on-error: true
+
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.get-tag.outputs.tag }}
           files: dist/release/*
-          overwrite: true
           generate_release_notes: true
           body: |
             ## Downloads
