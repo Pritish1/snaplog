@@ -843,6 +843,8 @@ jobs:
     needs: [build-windows, notarize-macos-intel, notarize-macos-arm]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
