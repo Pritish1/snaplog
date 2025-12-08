@@ -847,18 +847,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Get release tag
+        id: get-tag
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Creating/updating release for tag: $TAG"
+
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
           name: snaplog-windows-amd64
           path: dist/windows
-
-      - name: Download macOS signed app (may not be notarized yet)
-        uses: actions/download-artifact@v4
-        with:
-          name: snaplog-macos-intel-signed
-          path: dist/macos
-          continue-on-error: true
 
       - name: Download macOS notarized artifacts (Intel)
         uses: actions/download-artifact@v4
@@ -875,30 +875,57 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p dist/release
-          cp dist/windows/snaplog.exe dist/release/ || true
           
-          # Copy Intel macOS app
+          # Copy Windows executable
+          if [ -f dist/windows/snaplog.exe ]; then
+            cp dist/windows/snaplog.exe dist/release/snaplog.exe
+            echo "✓ Windows executable copied"
+          else
+            echo "⚠ Warning: Windows executable not found"
+          fi
+          
+          # Copy Intel macOS app and DMG
           if [ -d dist/macos-intel/snaplog.app ]; then
             echo "Including Intel macOS app"
-            cp -r dist/macos-intel/snaplog.app dist/release/snaplog-intel.app || true
-            if [ -f dist/macos-intel/snaplog.dmg ]; then
-              cp dist/macos-intel/snaplog.dmg dist/release/snaplog-intel.dmg || true
-            fi
+            cp -r dist/macos-intel/snaplog.app dist/release/snaplog-intel.app
+            echo "✓ Intel macOS app copied"
+          else
+            echo "⚠ Warning: Intel macOS app not found"
           fi
           
-          # Copy ARM64 macOS app
+          if [ -f dist/macos-intel/snaplog.dmg ]; then
+            cp dist/macos-intel/snaplog.dmg dist/release/snaplog-intel.dmg
+            echo "✓ Intel macOS DMG copied"
+          else
+            echo "⚠ Warning: Intel macOS DMG not found"
+          fi
+          
+          # Copy ARM64 macOS app and DMG
           if [ -d dist/macos-arm64/snaplog.app ]; then
             echo "Including ARM64 macOS app"
-            cp -r dist/macos-arm64/snaplog.app dist/release/snaplog-arm64.app || true
-            if [ -f dist/macos-arm64/snaplog-arm64.dmg ]; then
-              cp dist/macos-arm64/snaplog-arm64.dmg dist/release/snaplog-arm64.dmg || true
-            fi
+            cp -r dist/macos-arm64/snaplog.app dist/release/snaplog-arm64.app
+            echo "✓ ARM64 macOS app copied"
+          else
+            echo "⚠ Warning: ARM64 macOS app not found"
           fi
+          
+          if [ -f dist/macos-arm64/snaplog-arm64.dmg ]; then
+            cp dist/macos-arm64/snaplog-arm64.dmg dist/release/snaplog-arm64.dmg
+            echo "✓ ARM64 macOS DMG copied"
+          else
+            echo "⚠ Warning: ARM64 macOS DMG not found"
+          fi
+          
+          echo ""
+          echo "Release files prepared:"
+          ls -lh dist/release/
 
-      - name: Create Release
+      - name: Create or Update Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.get-tag.outputs.tag }}
           files: dist/release/*
+          overwrite: true
           generate_release_notes: true
           body: |
             ## Downloads
@@ -908,54 +935,6 @@ jobs:
             - **macOS ARM64**: `snaplog-arm64.app` and `snaplog-arm64.dmg` (for Apple Silicon Macs)
             
             > **Note**: Both macOS builds are notarized and ready to use.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  update-release-with-notarized:
-    name: Update Release with Notarized macOS
-    needs: [release, notarize-macos-intel, notarize-macos-arm]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download notarized macOS artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: snaplog-macos-amd64
-          path: dist/macos-intel
-      
-      - name: Download notarized macOS ARM64 artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: snaplog-macos-arm64
-          path: dist/macos-arm64
-
-      - name: Get release tag
-        id: get-tag
-        run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-
-      - name: Upload notarized files to release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            dist/macos-intel/snaplog.app
-            dist/macos-intel/snaplog.dmg
-            dist/macos-arm64/snaplog.app
-            dist/macos-arm64/snaplog-arm64.dmg
-          tag_name: ${{ steps.get-tag.outputs.tag }}
-          body: |
-            ## Notarized macOS Builds Available
-            
-            Both macOS builds have been successfully notarized by Apple.
-            
-            - `snaplog.app` - Notarized Intel application
-            - `snaplog.dmg` - Disk image with Intel app
-            - `snaplog.app` (ARM64) - Notarized Apple Silicon application  
-            - `snaplog-arm64.dmg` - Disk image with ARM64 app
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
