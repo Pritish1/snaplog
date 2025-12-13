@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SnapLog</title>
+    <title>Snaplog</title>
     <meta name="description" content="A lightweight journaling utility that captures notes from anywhere with a single hotkey. Built with Go and React, stores everything locally in SQLite.">
     <link rel="icon" type="image/png" href="appicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,10 +51,6 @@
         }
 
         .header-main {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 60px;
-            align-items: center;
             margin-bottom: 40px;
         }
 
@@ -109,12 +105,6 @@
             font-size: 16px;
             color: var(--text-lighter);
             margin-bottom: 24px;
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
 
         /* Download Buttons */
@@ -300,17 +290,19 @@
         }
 
         /* Demo */
-        .demo-gif {
+        .demo-video {
             width: 100%;
             max-width: 100%;
+            aspect-ratio: 16 / 9;
             border-radius: 8px;
             border: 1px solid var(--border);
             display: block;
+            margin-top: 40px;
         }
 
         .demo-placeholder {
             width: 100%;
-            height: 400px;
+            aspect-ratio: 16 / 9;
             background: #f5f5f5;
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -319,6 +311,7 @@
             justify-content: center;
             color: var(--text-lighter);
             font-size: 14px;
+            margin-top: 40px;
         }
 
         /* Footer */
@@ -351,11 +344,6 @@
 
         /* Responsive */
         @media (max-width: 968px) {
-            .header-main {
-                grid-template-columns: 1fr;
-                gap: 40px;
-            }
-
             .header-content {
                 justify-content: center;
             }
@@ -426,11 +414,11 @@
                         <a href="https://github.com/Pritish1/snaplog/releases/latest/download/snaplog-intel.dmg" class="download-btn">Download for macOS (Intel)</a>
                         <a href="https://github.com/Pritish1/snaplog/releases/latest/download/snaplog-arm64.dmg" class="download-btn">Download for macOS (Apple Silicon)</a>
                     </div>
-                </div>
-                <div class="header-right">
-                    <img src="demo.gif" alt="Snaplog Demo" class="demo-gif" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <video src="demo.mp4" class="demo-video" controls loop muted playsinline onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        Your browser does not support the video tag.
+                    </video>
                     <div class="demo-placeholder" style="display: none;">
-                        <div>Add demo.gif to display here</div>
+                        <div>Add demo.mp4 to display here</div>
                     </div>
                 </div>
             </div>
@@ -492,7 +480,6 @@
                 <div><span class="cli-prompt">$</span> <span class="cli-command">/settings</span> <span class="cli-comment"># Open settings to configure hotkey and theme</span></div>
                 <div><span class="cli-prompt">$</span> <span class="cli-command">/edit &lt;id&gt;</span> <span class="cli-comment"># Edit entry by ID</span></div>
                 <div><span class="cli-prompt">$</span> <span class="cli-command">/editprev</span> <span class="cli-comment"># Edit most recent entry</span></div>
-                <div><span class="cli-prompt">$</span> <span class="cli-command">/delete &lt;id&gt;</span> <span class="cli-comment"># Delete entry by ID</span></div>
                 <div><span class="cli-prompt">$</span> <span class="cli-command">/delprev</span> <span class="cli-comment"># Delete most recent entry</span></div>
             </div>
 
@@ -511,6 +498,11 @@
                     <span class="shortcut-key">Esc</span>
                 </div>
             </div>
+
+            <h3>Managing Entries in the Dashboard</h3>
+            <p>When viewing entries in the dashboard (via <code>/dash</code>), you can manage your entries:</p>
+            <p><strong>Delete entries:</strong> Click the delete button on any entry directly in the dashboard to remove it permanently.</p>
+            <p><strong>Edit entries:</strong> Click the edit icon on an entry in the dashboard. This will copy the edit command to your clipboard. Paste the command into the logger window and press Enter to edit the entry.</p>
         </section>
     </main>
 
