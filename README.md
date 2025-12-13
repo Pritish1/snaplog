@@ -6,8 +6,8 @@ A lightweight journaling utility that captures notes from anywhere with a single
 
 - **Global hotkey**: Default `Ctrl+Shift+L` (configurable)
 - **Quick capture**: Type → Enter → done
-- **Markdown support**: Live preview with `Ctrl/Cmd+Tab`
-- **Commands**: `/dash` (dashboard), `/settings`, `/edit <id>`, `/delete <id>`, `/editprev`, `/delprev`
+- **Markdown support**: Full markdown rendering in entries
+- **Commands**: `/dash` (dashboard), `/settings`, `/edit <id>`, `/editprev`, `/delprev`
 - **Tags**: Use `#tag` in entries for organization
 - **Dashboard**: HTML view with filtering by date and tags
 
@@ -61,7 +61,6 @@ The GitHub Actions workflow automatically copies icons during CI builds.
 
 - **Enter**: Save and hide window
 - **Shift+Enter**: New line
-- **Ctrl/Cmd+Tab**: Toggle markdown preview
 - **Esc**: Hide window without saving
 
 ### Commands
@@ -70,8 +69,12 @@ The GitHub Actions workflow automatically copies icons during CI builds.
 - `/settings` - Open settings
 - `/edit <id>` - Edit entry by ID
 - `/editprev` - Edit most recent entry
-- `/delete <id>` - Delete entry by ID
 - `/delprev` - Delete most recent entry
+
+### Managing Entries in the Dashboard
+
+- **Delete entries**: Click 🗑️ to delete the entry
+- **Edit entries**: Click ✏️ → Paste the copied command in the CLI → Edit the entry → Press Enter
 
 ## Data Locations
 
@@ -83,11 +86,12 @@ The GitHub Actions workflow automatically copies icons during CI builds.
 ## Platform Notes
 
 **macOS**
-- Requires Accessibility permission for global hotkeys
-- Grant permission in System Settings → Privacy & Security → Accessibility
+- App is notarized by Apple for security
+- No additional setup required
 
 **Windows**
 - No additional setup required
+- App is not code-signed
 
 **Linux**
 - Requires X11 for global hotkeys (may not work on Wayland)
